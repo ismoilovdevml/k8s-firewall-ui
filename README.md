@@ -45,9 +45,20 @@ Set `readOnly: true` to deploy without write permissions (the ClusterRole drops 
 
 ### Docker
 
+Prebuilt multi-arch images (amd64/arm64) are published to GHCR on every release:
+
+```bash
+docker run --rm -p 8080:8080 -v ~/.kube/config:/kubeconfig:ro \
+  ghcr.io/ismoilovdevml/k8s-firewall-ui:latest --kubeconfig /kubeconfig
+```
+
+Or build locally:
+
 ```bash
 docker build -t k8s-firewall-ui .
 ```
+
+Release binaries for Linux and macOS are attached to [GitHub Releases](https://github.com/ismoilovdevml/k8s-firewall-ui/releases).
 
 ## How the simulator works
 
