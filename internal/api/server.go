@@ -58,6 +58,7 @@ func (s *Server) Routes(r chi.Router) {
 		r.Post("/namespaces/{ns}/networkpolicies", s.handlePolicyCreate)
 		r.Put("/namespaces/{ns}/networkpolicies/{name}", s.handlePolicyUpdate)
 		r.Delete("/namespaces/{ns}/networkpolicies/{name}", s.handlePolicyDelete)
+		r.Post("/simulate", s.handleSimulate)
 		r.Get("/topology", s.handleTopology)
 		r.Get("/events", s.hub.serveHTTP)
 	})

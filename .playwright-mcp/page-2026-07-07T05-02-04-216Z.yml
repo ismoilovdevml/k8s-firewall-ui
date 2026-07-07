@@ -1,0 +1,71 @@
+- generic [ref=f2e3]:
+  - generic [ref=f2e4]:
+    - complementary [ref=f2e5]:
+      - generic [ref=f2e6]: k8s-firewall-ui
+      - navigation [ref=f2e7]:
+        - link "Topology live traffic map" [ref=f2e8] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f2e9]: Topology
+          - generic [ref=f2e10]: live traffic map
+        - link "Policies rules on the cluster" [ref=f2e11] [cursor=pointer]:
+          - /url: /policies
+          - generic [ref=f2e12]: Policies
+          - generic [ref=f2e13]: rules on the cluster
+        - link "Simulator test a connection" [ref=f2e14] [cursor=pointer]:
+          - /url: /simulator
+          - generic [ref=f2e15]: Simulator
+          - generic [ref=f2e16]: test a connection
+        - link "Builder draw a policy" [ref=f2e17] [cursor=pointer]:
+          - /url: /builder
+          - generic [ref=f2e18]: Builder
+          - generic [ref=f2e19]: draw a policy
+    - main [ref=f2e20]:
+      - generic [ref=f2e21]:
+        - heading "Connection simulator" [level=1] [ref=f2e22]
+        - paragraph [ref=f2e23]: Answers “can A reach B?” from the NetworkPolicies on the cluster, and explains which rule decided each side.
+        - generic [ref=f2e24]:
+          - generic [ref=f2e25]:
+            - heading "source pod" [level=2] [ref=f2e26]
+            - generic [ref=f2e27]:
+              - combobox [ref=f2e28]:
+                - option "namespace…" [selected]
+                - option "demo-a"
+                - option "demo-b"
+                - option "kube-system"
+                - option "local-path-storage"
+              - combobox [disabled] [ref=f2e29]:
+                - option "pod…" [selected]
+          - generic [ref=f2e30]:
+            - generic [ref=f2e31]:
+              - heading "destination" [level=2] [ref=f2e32]
+              - generic [ref=f2e33]:
+                - button "pod" [ref=f2e34]
+                - button "external IP" [ref=f2e35]
+            - generic [ref=f2e36]:
+              - combobox [ref=f2e37]:
+                - option "namespace…" [selected]
+                - option "demo-a"
+                - option "demo-b"
+                - option "kube-system"
+                - option "local-path-storage"
+              - combobox [disabled] [ref=f2e38]:
+                - option "pod…" [selected]
+        - generic [ref=f2e39]:
+          - generic [ref=f2e40]:
+            - generic [ref=f2e41]: protocol
+            - combobox "protocol" [ref=f2e42]:
+              - option "TCP" [selected]
+              - option "UDP"
+              - option "SCTP"
+          - generic [ref=f2e43]:
+            - generic [ref=f2e44]: port
+            - textbox "port" [ref=f2e45]:
+              - /placeholder: any
+          - button "Simulate" [disabled] [ref=f2e46]
+  - contentinfo [ref=f2e47]:
+    - generic [ref=f2e48]: cluster v1.36.1
+    - generic [ref=f2e49]: ·
+    - generic [ref=f2e50]: CNI calico policies enforced ✓
+    - generic [ref=f2e51]: ·
+    - generic [ref=f2e52]: ANP present (not evaluated)
+    - generic [ref=f2e53]: dev

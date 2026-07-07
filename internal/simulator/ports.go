@@ -9,8 +9,9 @@ import (
 
 // portsMatch reports whether a rule's port list admits the queried port.
 // Empty/absent ports = all ports. A nil query means "any port": the rule's
-// port list cannot block it (some port is always admitted).
-func portsMatch(rulePorts []networkingv1.NetworkPolicyPort, query *PortQuery, dst kube.PodInfo) bool {
+// port list cannot block it (some port is always admitted). dst may be nil
+// (external IP destination) — named ports then never resolve.
+func portsMatch(rulePorts []networkingv1.NetworkPolicyPort, query *PortQuery, dst *kube.PodInfo) bool {
 	if len(rulePorts) == 0 || query == nil {
 		return true
 	}
@@ -22,7 +23,7 @@ func portsMatch(rulePorts []networkingv1.NetworkPolicyPort, query *PortQuery, ds
 	return false
 }
 
-func portEntryMatches(rp networkingv1.NetworkPolicyPort, query *PortQuery, dst kube.PodInfo) bool {
+func portEntryMatches(rp networkingv1.NetworkPolicyPort, query *PortQuery, dst *kube.PodInfo) bool {
 	proto := "TCP"
 	if rp.Protocol != nil {
 		proto = string(*rp.Protocol)
@@ -42,6 +43,9 @@ func portEntryMatches(rp networkingv1.NetworkPolicyPort, query *PortQuery, dst k
 		return query.Port == start
 	case intstr.String:
 		// Named ports resolve against the destination pod's container ports.
+		if dst == nil {
+			return false
+		}
 		for _, cp := range dst.Ports {
 			if cp.Name == rp.Port.StrVal && string(cp.Protocol) == query.Protocol && cp.Port == query.Port {
 				return true
