@@ -1,0 +1,70 @@
+- generic [ref=f1e3]:
+  - generic [ref=f1e4]:
+    - complementary [ref=f1e5]:
+      - generic [ref=f1e6]: k8s-firewall-ui
+      - navigation [ref=f1e7]:
+        - link "Topology live traffic map" [ref=f1e8] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f1e9]: Topology
+          - generic [ref=f1e10]: live traffic map
+        - link "Policies rules on the cluster" [ref=f1e11] [cursor=pointer]:
+          - /url: /policies
+          - generic [ref=f1e12]: Policies
+          - generic [ref=f1e13]: rules on the cluster
+        - link "Simulator test a connection" [ref=f1e14] [cursor=pointer]:
+          - /url: /simulator
+          - generic [ref=f1e15]: Simulator
+          - generic [ref=f1e16]: test a connection
+        - link "Builder draw a policy" [ref=f1e17] [cursor=pointer]:
+          - /url: /builder
+          - generic [ref=f1e18]: Builder
+          - generic [ref=f1e19]: draw a policy
+    - main [ref=f1e20]:
+      - generic [ref=f1e21]:
+        - generic [ref=f1e22]:
+          - heading "NetworkPolicies" [level=1] [ref=f1e23]
+          - link "New policy" [ref=f1e24] [cursor=pointer]:
+            - /url: /policies/new
+        - generic [ref=f1e25]:
+          - combobox [ref=f1e26]:
+            - option "all namespaces" [selected]
+            - option "default (0)"
+            - option "demo-a (0)"
+            - option "demo-b (2)"
+            - option "kube-node-lease (0)"
+            - option "kube-public (0)"
+            - option "kube-system (0)"
+            - option "local-path-storage (0)"
+          - textbox "Filter by name…" [ref=f1e27]
+        - table [ref=f1e29]:
+          - rowgroup [ref=f1e30]:
+            - row "namespace name directions pods matched created" [ref=f1e31]:
+              - columnheader "namespace" [ref=f1e32]
+              - columnheader "name" [ref=f1e33]
+              - columnheader "directions" [ref=f1e34]
+              - columnheader "pods matched" [ref=f1e35]
+              - columnheader "created" [ref=f1e36]
+          - rowgroup [ref=f1e37]:
+            - row "demo-b allow-web-from-a Ingress 1 2026-07-07" [ref=f1e38]:
+              - cell "demo-b" [ref=f1e39]
+              - cell "allow-web-from-a" [ref=f1e40]:
+                - link "allow-web-from-a" [ref=f1e41] [cursor=pointer]:
+                  - /url: /policies/demo-b/allow-web-from-a
+              - cell "Ingress" [ref=f1e42]
+              - cell "1" [ref=f1e43]
+              - cell "2026-07-07" [ref=f1e44]
+            - row "demo-b default-deny-ingress Ingress 1 2026-07-07" [ref=f1e45]:
+              - cell "demo-b" [ref=f1e46]
+              - cell "default-deny-ingress" [ref=f1e47]:
+                - link "default-deny-ingress" [ref=f1e48] [cursor=pointer]:
+                  - /url: /policies/demo-b/default-deny-ingress
+              - cell "Ingress" [ref=f1e49]
+              - cell "1" [ref=f1e50]
+              - cell "2026-07-07" [ref=f1e51]
+  - contentinfo [ref=f1e52]:
+    - generic [ref=f1e53]: cluster v1.36.1
+    - generic [ref=f1e54]: ·
+    - generic [ref=f1e55]: CNI calico policies enforced ✓
+    - generic [ref=f1e56]: ·
+    - generic [ref=f1e57]: ANP present (not evaluated)
+    - generic [ref=f1e58]: dev
