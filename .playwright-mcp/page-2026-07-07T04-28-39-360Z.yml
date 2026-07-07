@@ -1,0 +1,47 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - generic [ref=e6]: k8s-firewall-ui
+      - navigation [ref=e7]:
+        - link "Topology live traffic map" [ref=e8] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e9]: Topology
+          - generic [ref=e10]: live traffic map
+        - link "Policies rules on the cluster" [ref=e11] [cursor=pointer]:
+          - /url: /policies
+          - generic [ref=e12]: Policies
+          - generic [ref=e13]: rules on the cluster
+        - link "Simulator test a connection" [ref=e14] [cursor=pointer]:
+          - /url: /simulator
+          - generic [ref=e15]: Simulator
+          - generic [ref=e16]: test a connection
+        - link "Builder draw a policy" [ref=e17] [cursor=pointer]:
+          - /url: /builder
+          - generic [ref=e18]: Builder
+          - generic [ref=e19]: draw a policy
+    - main [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - generic [ref=e24]: namespaces
+            - button "default0" [ref=e25]
+            - button "demo-a3" [ref=e26]
+            - button "demo-b1" [ref=e27]
+          - generic [ref=e28]:
+            - generic [ref=e29]:
+              - img [ref=e30]
+              - text: allowed
+            - generic [ref=e31]:
+              - img [ref=e32]
+              - text: blocked
+            - generic [ref=e33]:
+              - img [ref=e34]
+              - text: unconstrained
+        - paragraph [ref=e37]: Select one or more namespaces above to map their traffic.
+  - contentinfo [ref=e38]:
+    - generic [ref=e39]: cluster v1.36.1
+    - generic [ref=e40]: ·
+    - generic [ref=e41]: CNI calico policies enforced ✓
+    - generic [ref=e42]: ·
+    - generic [ref=e43]: ANP present (not evaluated)
+    - generic [ref=e44]: dev

@@ -1,14 +1,30 @@
-function App() {
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import Layout from './components/Layout'
+import TopologyPage from './pages/TopologyPage'
+import PoliciesPage from './pages/PoliciesPage'
+import SimulatorPage from './pages/SimulatorPage'
+import BuilderPage from './pages/BuilderPage'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 5_000, refetchOnWindowFocus: false },
+  },
+})
+
+export default function App() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-100">
-      <div className="text-center">
-        <h1 className="text-3xl font-semibold">k8s-firewall-ui</h1>
-        <p className="mt-2 text-slate-400">
-          Visual firewall dashboard for Kubernetes NetworkPolicies — coming together.
-        </p>
-      </div>
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route index element={<TopologyPage />} />
+            <Route path="policies" element={<PoliciesPage />} />
+            <Route path="simulator" element={<SimulatorPage />} />
+            <Route path="builder" element={<BuilderPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
   )
 }
-
-export default App

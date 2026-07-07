@@ -1,1 +1,35 @@
 @import 'tailwindcss';
+
+@theme {
+  /* Control-room palette: deep navy-slate base, firewall-amber accent,
+     semantic verdict colors (allow/block/quiet). */
+  --color-base: #0b1220;
+  --color-surface: #121a2b;
+  --color-raised: #1a2438;
+  --color-edge: #263049;
+  --color-text: #dce4f2;
+  --color-muted: #8093b0;
+  --color-accent: #ffa03e;
+  --color-allow: #3ecf8e;
+  --color-block: #f26d6d;
+  --color-quiet: #5d6b85;
+
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-base);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+/* React Flow dark theme adjustments */
+.react-flow__attribution {
+  background: transparent;
+  color: var(--color-quiet);
+}
