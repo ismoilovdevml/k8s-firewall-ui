@@ -1,0 +1,22 @@
+# Binaries
+bin/
+*.test
+
+# Frontend
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
+web/coverage/
+
+# Go
+coverage.out
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Env
+.env
+.env.*
