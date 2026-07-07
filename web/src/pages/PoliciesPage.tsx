@@ -18,7 +18,7 @@ export default function PoliciesPage() {
         <h1 className="font-mono text-lg font-semibold text-text">NetworkPolicies</h1>
         <Link
           to="/policies/new"
-          className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-base hover:brightness-110"
+          className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:brightness-110"
         >
           New policy
         </Link>

@@ -143,7 +143,7 @@ export default function SimulatorPage() {
         <button
           onClick={run}
           disabled={!ready || simulate.isPending}
-          className="rounded bg-accent px-4 py-1.5 text-sm font-medium text-base hover:brightness-110 disabled:opacity-50"
+          className="rounded bg-accent px-4 py-1.5 text-sm font-medium text-on-accent hover:brightness-110 disabled:opacity-50"
         >
           Simulate
         </button>

@@ -73,7 +73,7 @@ export default function PolicyNewPage() {
         <button
           onClick={() => submit(false)}
           disabled={!ready || create.isPending}
-          className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-base hover:brightness-110 disabled:opacity-50"
+          className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:brightness-110 disabled:opacity-50"
         >
           Create policy
         </button>
