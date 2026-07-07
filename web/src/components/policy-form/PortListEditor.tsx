@@ -48,13 +48,13 @@ export default function PortListEditor({ value, onChange }: Props) {
       ))}
       {value.length === 0 && (
         <p className="text-xs text-quiet">
-          No ports — allows <span className="text-accent">all ports</span>.
+          No ports — allows <span className="text-accent-strong">all ports</span>.
         </p>
       )}
       <button
         type="button"
         onClick={() => onChange([...value, { protocol: 'TCP', port: '' }])}
-        className="rounded border border-edge px-2 py-1 text-xs text-muted hover:border-accent hover:text-accent"
+        className="rounded border border-edge px-2 py-1 text-xs text-muted hover:border-accent hover:text-accent-strong"
       >
         Add port
       </button>

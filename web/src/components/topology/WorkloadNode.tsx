@@ -9,7 +9,7 @@ export default function WorkloadNode({ data }: NodeProps) {
   const [kind, name] = info.workload.split('/', 2)
 
   return (
-    <div className="w-[220px] rounded-md border border-edge bg-raised px-3 py-2 shadow-lg shadow-black/30">
+    <div className="w-[220px] rounded-md border border-edge bg-surface px-3 py-2 shadow-sm">
       <Handle type="target" position={Position.Left} className="!bg-quiet" />
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate font-mono text-sm font-semibold text-text">{name}</span>
@@ -23,7 +23,7 @@ export default function WorkloadNode({ data }: NodeProps) {
         </span>
         {info.hostNetwork && (
           <span
-            className="text-accent"
+            className="text-warn-text"
             title="Runs on the host network — policy selectors do not apply to it"
           >
             hostNet

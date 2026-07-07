@@ -10,15 +10,15 @@ const theme = EditorView.theme(
       fontSize: '13px',
     },
     '.cm-gutters': {
-      backgroundColor: 'var(--color-surface)',
+      backgroundColor: 'var(--color-raised)',
       color: 'var(--color-quiet)',
       border: 'none',
     },
-    '.cm-activeLine': { backgroundColor: 'rgba(255,255,255,0.03)' },
+    '.cm-activeLine': { backgroundColor: 'rgba(6, 55, 58, 0.05)' },
     '.cm-activeLineGutter': { backgroundColor: 'transparent' },
     '&.cm-focused': { outline: 'none' },
   },
-  { dark: true },
+  { dark: false },
 )
 
 interface Props {

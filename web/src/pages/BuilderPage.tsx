@@ -91,8 +91,8 @@ export default function BuilderPage() {
         id: `e-${card.id}`,
         source: '__target__',
         target: card.id,
-        style: { stroke: 'var(--color-accent)' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--color-accent)' },
+        style: { stroke: 'var(--color-accent-strong)' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--color-accent-strong)' },
       })),
     ]
     return { nodes: ns, edges: es }
@@ -146,27 +146,27 @@ export default function BuilderPage() {
           <div className="ml-auto flex gap-2">
             <button
               onClick={() => store.addPeer('ingress')}
-              className="rounded border border-allow/50 px-3 py-1.5 text-sm text-allow hover:bg-allow/10"
+              className="rounded border border-allow/50 px-3 py-1.5 text-sm text-accent-strong hover:bg-allow/10"
             >
               + Allow from…
             </button>
             <button
               onClick={() => store.addPeer('egress')}
-              className="rounded border border-accent/50 px-3 py-1.5 text-sm text-accent hover:bg-accent/10"
+              className="rounded border border-accent-strong/50 px-3 py-1.5 text-sm text-accent-strong hover:bg-accent-strong/10"
             >
               + Allow to…
             </button>
             <button
               onClick={() => submit(true)}
               disabled={!ready || create.isPending}
-              className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent disabled:opacity-50"
+              className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong disabled:opacity-50"
             >
               Validate
             </button>
             <button
               onClick={() => submit(false)}
               disabled={!ready || create.isPending}
-              className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-base hover:brightness-110 disabled:opacity-50"
+              className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:brightness-110 disabled:opacity-50"
             >
               Create
             </button>
@@ -174,7 +174,7 @@ export default function BuilderPage() {
         </div>
 
         {feedback && (
-          <p className={`px-4 pt-2 font-mono text-xs ${feedback.tone === 'ok' ? 'text-allow' : 'text-block'}`}>
+          <p className={`px-4 pt-2 font-mono text-xs ${feedback.tone === 'ok' ? 'text-accent-strong' : 'text-block'}`}>
             {feedback.text}
           </p>
         )}
@@ -189,7 +189,7 @@ export default function BuilderPage() {
             onPaneClick={() => store.select(null)}
             fitView
             proOptions={{ hideAttribution: true }}
-            colorMode="dark"
+            colorMode="light"
             nodesDraggable={false}
             nodesConnectable={false}
           >
@@ -317,7 +317,7 @@ function LoadExisting() {
           </option>
         ))}
       </select>
-      {notice && <span className="ml-2 font-mono text-[10px] text-accent">{notice}</span>}
+      {notice && <span className="ml-2 font-mono text-[10px] text-warn-text">{notice}</span>}
     </label>
   )
 }

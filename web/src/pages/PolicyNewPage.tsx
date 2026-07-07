@@ -47,17 +47,17 @@ export default function PolicyNewPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-6">
-      <Link to="/policies" className="font-mono text-xs text-quiet hover:text-accent">
+      <Link to="/policies" className="font-mono text-xs text-quiet hover:text-accent-strong">
         ← policies
       </Link>
-      <h1 className="mt-1 font-mono text-lg font-semibold text-text">New NetworkPolicy</h1>
+      <h1 className="mt-1 text-lg font-bold text-text">New NetworkPolicy</h1>
 
       <div className="mt-4">
         <PolicyForm value={draft} onChange={setDraft} namespaces={userNamespaces} />
       </div>
 
       {feedback && (
-        <p className={`mt-3 font-mono text-xs ${feedback.tone === 'ok' ? 'text-allow' : 'text-block'}`}>
+        <p className={`mt-3 font-mono text-xs ${feedback.tone === 'ok' ? 'text-accent-strong' : 'text-block'}`}>
           {feedback.text}
         </p>
       )}
@@ -66,14 +66,14 @@ export default function PolicyNewPage() {
         <button
           onClick={() => submit(true)}
           disabled={!ready || create.isPending}
-          className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent disabled:opacity-50"
+          className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong disabled:opacity-50"
         >
           Validate (dry-run)
         </button>
         <button
           onClick={() => submit(false)}
           disabled={!ready || create.isPending}
-          className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-base hover:brightness-110 disabled:opacity-50"
+          className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:brightness-110 disabled:opacity-50"
         >
           Create policy
         </button>

@@ -70,7 +70,7 @@ export default function LabelMapEditor({ value, onChange, emptyHint }: Props) {
           type="button"
           onClick={add}
           disabled={!key.trim()}
-          className="rounded border border-edge px-2 py-1 text-xs text-muted hover:border-accent hover:text-accent disabled:opacity-40"
+          className="rounded border border-edge px-2 py-1 text-xs text-muted hover:border-accent hover:text-accent-strong disabled:opacity-40"
         >
           Add label
         </button>
