@@ -1,0 +1,8 @@
+bin/
+web/node_modules/
+web/dist/
+docs/
+deploy/
+.github/
+.git/
+*.md

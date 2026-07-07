@@ -152,9 +152,7 @@ func (s *Server) handlePolicyGet(w http.ResponseWriter, r *http.Request) {
 // podSelector matches (simulator semantics: empty selector = all pods).
 func affectedPods(snap *kube.ClusterSnapshot, pol *networkingv1.NetworkPolicy) []kube.PodInfo {
 	out := []kube.PodInfo{}
-	for _, p := range simulator.PodsSelectedBy(snap, pol) {
-		out = append(out, p)
-	}
+	out = append(out, simulator.PodsSelectedBy(snap, pol)...)
 	return out
 }
 

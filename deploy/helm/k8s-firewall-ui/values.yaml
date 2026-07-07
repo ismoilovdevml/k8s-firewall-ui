@@ -1,0 +1,38 @@
+image:
+  repository: ghcr.io/ismoilovdevml/k8s-firewall-ui
+  tag: ""            # defaults to the chart appVersion
+  pullPolicy: IfNotPresent
+
+# Run without create/update/delete permissions — safe for evaluation.
+readOnly: false
+
+# Skip CNI auto-detection and trust this provider name (e.g. "calico").
+cniOverride: ""
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: firewall-ui.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

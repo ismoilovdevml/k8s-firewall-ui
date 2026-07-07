@@ -1,0 +1,9 @@
+apiVersion: v2
+name: k8s-firewall-ui
+description: Visual firewall dashboard for Kubernetes NetworkPolicies
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/ismoilovdevml/k8s-firewall-ui
+sources:
+  - https://github.com/ismoilovdevml/k8s-firewall-ui

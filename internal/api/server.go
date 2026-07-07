@@ -18,21 +18,35 @@ type Server struct {
 	clientset  kubernetes.Interface
 	cniResult  cni.Result
 	k8sVersion string
+	readOnly   bool
 	hub        *sseHub
 }
 
 // NewServer constructs the API server. Call Run on the returned hub context
 // via Router; the SSE hub goroutine starts immediately.
-func NewServer(store *kube.Store, clientset kubernetes.Interface, cniResult cni.Result, k8sVersion string) *Server {
+func NewServer(store *kube.Store, clientset kubernetes.Interface, cniResult cni.Result, k8sVersion string, readOnly bool) *Server {
 	s := &Server{
 		store:      store,
 		clientset:  clientset,
 		cniResult:  cniResult,
 		k8sVersion: k8sVersion,
+		readOnly:   readOnly,
 		hub:        newSSEHub(),
 	}
 	go s.hub.run(store.Events())
 	return s
+}
+
+// guardWrites returns 403 for every request when the server runs read-only.
+func (s *Server) guardWrites(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.readOnly {
+			writeError(w, http.StatusForbidden, "READ_ONLY",
+				"this instance runs in read-only mode; policy changes are disabled")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Routes registers all API routes on r.
@@ -55,9 +69,12 @@ func (s *Server) Routes(r chi.Router) {
 		r.Get("/pods", s.handlePods)
 		r.Get("/networkpolicies", s.handlePolicyList)
 		r.Get("/namespaces/{ns}/networkpolicies/{name}", s.handlePolicyGet)
-		r.Post("/namespaces/{ns}/networkpolicies", s.handlePolicyCreate)
-		r.Put("/namespaces/{ns}/networkpolicies/{name}", s.handlePolicyUpdate)
-		r.Delete("/namespaces/{ns}/networkpolicies/{name}", s.handlePolicyDelete)
+		r.Group(func(r chi.Router) {
+			r.Use(s.guardWrites)
+			r.Post("/namespaces/{ns}/networkpolicies", s.handlePolicyCreate)
+			r.Put("/namespaces/{ns}/networkpolicies/{name}", s.handlePolicyUpdate)
+			r.Delete("/namespaces/{ns}/networkpolicies/{name}", s.handlePolicyDelete)
+		})
 		r.Post("/simulate", s.handleSimulate)
 		r.Get("/topology", s.handleTopology)
 		r.Get("/events", s.hub.serveHTTP)

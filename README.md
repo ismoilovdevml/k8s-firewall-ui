@@ -2,33 +2,28 @@
 
 **A visual firewall dashboard for Kubernetes NetworkPolicies** — view, create, edit, simulate, and manage network policies on a live cluster.
 
-> No open-source tool today combines a live-cluster view, a visual policy builder, apply/CRUD, and connection simulation. k8s-firewall-ui fills that gap: it is CNI-agnostic, self-hosted, and Apache-2.0 licensed.
+> No open-source tool combines a live-cluster view, a visual policy builder, apply/CRUD, and connection simulation — that combination only exists in commercial products. k8s-firewall-ui fills the gap: CNI-agnostic, self-hosted, Apache-2.0.
+
+![Topology view](docs/screenshots/topology.png)
 
 ## Features
 
-- 🗺️ **Topology viewer** — live graph of namespaces and workloads with policy-derived edges (allowed / blocked / unconstrained)
-- ✏️ **Policy management** — list, inspect, create, edit (YAML + form), and delete NetworkPolicies with server-side dry-run validation
-- 🧪 **Connection simulator** — "can pod A reach pod B on port 5432?" answered with a full explanation of which policy and rule allowed or denied each side
-- 🧱 **Visual builder** — drag-and-drop policy authoring with a live YAML preview
-- 🚨 **CNI awareness** — detects your CNI and warns loudly when NetworkPolicies are not enforced (e.g. plain flannel)
-- ⚠️ **Built-in guardrails** — warnings for the DNS egress trap, hostNetwork pods, and other well-known NetworkPolicy footguns
+- 🗺️ **Topology viewer** — live graph of workloads with policy-derived edges: green = allowed by policy, red = blocked, dotted = no policy applies. Click an edge to see which policies decide it.
+- ✏️ **Policy management** — list, inspect (human-readable rule rendering), create, edit (form + YAML), and delete NetworkPolicies. Every change can be validated with a server-side dry-run first; concurrent edits are detected via resourceVersion.
+- 🧪 **Connection simulator** — "can pod A reach pod B on port 5432?" answered from the policy set, with the exact rule that allowed or denied each side and links to the policies.
 
-## Status
+  ![Simulator](docs/screenshots/simulator.png)
 
-Early development (v0.1 in progress).
+- 🧱 **Visual builder** — compose a policy on a canvas: peer cards flow into the target (ingress) or out of it (egress); separate cards are OR, an AND lives inside one card — the #1 NetworkPolicy authoring mistake, made visible. Live YAML preview as you build.
 
-| Milestone | Status |
-|---|---|
-| M0 Scaffold | 🚧 |
-| M1 Topology viewer | ⬜ |
-| M2 Policy CRUD | ⬜ |
-| M3 Connection simulator | ⬜ |
-| M4 Visual builder | ⬜ |
-| M5 Docker / Helm / CI | ⬜ |
+  ![Builder](docs/screenshots/builder.png)
 
-## Quickstart (local mode)
+- 🚨 **CNI awareness** — detects your CNI (Calico, Cilium, Antrea, flannel, …) and warns loudly when policies are silently unenforced (plain flannel, VPC CNI without the policy agent). Detects AdminNetworkPolicy CRDs and tells you results may be incomplete.
+- ⚠️ **Built-in guardrails** — warnings for the DNS egress trap (default-deny egress breaks DNS), hostNetwork pods (selectors don't match them), and node-local traffic bypass.
 
-Runs a single binary on your machine against your current kubeconfig:
+## Quickstart
+
+### Local mode (against your kubeconfig)
 
 ```bash
 git clone https://github.com/ismoilovdevml/k8s-firewall-ui.git
@@ -39,14 +34,45 @@ make run
 
 Requirements: Go 1.26+, Node 22+, a kubeconfig pointing at a cluster.
 
+### In-cluster (Helm)
+
+```bash
+helm install firewall-ui deploy/helm/k8s-firewall-ui
+kubectl port-forward svc/firewall-ui-k8s-firewall-ui 8080:8080
+```
+
+Set `readOnly: true` to deploy without write permissions (the ClusterRole drops the write verbs and the binary rejects mutations).
+
+### Docker
+
+```bash
+docker build -t k8s-firewall-ui .
+```
+
+## How the simulator works
+
+The engine is a pure function over an informer-cache snapshot, implementing the NetworkPolicy spec exactly: a connection is allowed iff the source's egress check AND the destination's ingress check both pass; a pod is default-allow until a policy selects it for that direction, then default-deny plus the union of matching rules. Peer AND/OR structure, `ipBlock` with `except`, named ports, `endPort` ranges, and empty-vs-missing rule lists are all covered by a table-driven test matrix, and verdicts are spot-checked against real Calico enforcement in CI-adjacent testing. See [docs/research/network-policy-semantics.md](docs/research/network-policy-semantics.md) for the semantics reference.
+
 ## Development
 
 ```bash
 make dev              # backend on :8080
 cd web && npm run dev # frontend on :5173, /api proxied to :8080
+make test test-web    # Go + vitest suites
 ```
 
-See [CLAUDE.md](CLAUDE.md) for architecture and conventions, and [docs/research/](docs/research/) for the NetworkPolicy semantics reference this project is built on.
+A local test cluster with real policy enforcement:
+
+```bash
+kind create cluster --name k8s-firewall-ui --config hack/kind-config.yaml
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml
+```
+
+Architecture and conventions: [CLAUDE.md](CLAUDE.md) · API reference: [docs/api.md](docs/api.md)
+
+## Status
+
+v0.1 — all core features implemented (topology, CRUD, simulator, builder, Helm/Docker/CI). Roadmap: token login with per-user RBAC, OIDC, AdminNetworkPolicy evaluation once the API reaches beta, policy generation from observed traffic.
 
 ## License
 

@@ -27,6 +27,7 @@ func main() {
 		listen      = flag.String("listen", ":8080", "address to listen on")
 		kubeconfig  = flag.String("kubeconfig", "", "path to kubeconfig (default: $KUBECONFIG, in-cluster, then ~/.kube/config)")
 		cniOverride = flag.String("cni-override", "", "skip CNI auto-detection and trust this provider name")
+		readOnly    = flag.Bool("read-only", false, "disable policy create/update/delete")
 		showVersion = flag.Bool("version", false, "print version and exit")
 	)
 	flag.Parse()
@@ -36,12 +37,12 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := run(*listen, *kubeconfig, *cniOverride); err != nil {
+	if err := run(*listen, *kubeconfig, *cniOverride, *readOnly); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(listen, kubeconfig, cniOverride string) error {
+func run(listen, kubeconfig, cniOverride string, readOnly bool) error {
 	ctx := context.Background()
 
 	clientset, _, err := kube.NewClientset(kubeconfig)
@@ -74,11 +75,10 @@ func run(listen, kubeconfig, cniOverride string) error {
 		log.Printf("warning: %s", warning)
 	}
 
-	srv := api.NewServer(store, clientset, cniResult, serverVersion)
+	srv := api.NewServer(store, clientset, cniResult, serverVersion, readOnly)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.RealIP)
 	srv.Routes(r)
 	r.NotFound(spaHandler())
 
