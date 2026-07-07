@@ -74,7 +74,7 @@ export default function SimulatorPage() {
 
   return (
     <div className="mx-auto max-w-4xl p-6">
-      <h1 className="font-mono text-lg font-semibold text-text">Connection simulator</h1>
+      <h1 className="text-lg font-bold text-text">Connection simulator</h1>
       <p className="mt-1 text-sm text-muted">
         Answers “can A reach B?” from the NetworkPolicies on the cluster, and explains which rule
         decided each side.

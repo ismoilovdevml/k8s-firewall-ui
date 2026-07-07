@@ -50,7 +50,7 @@ export default function PolicyNewPage() {
       <Link to="/policies" className="font-mono text-xs text-quiet hover:text-accent-strong">
         ← policies
       </Link>
-      <h1 className="mt-1 font-mono text-lg font-semibold text-text">New NetworkPolicy</h1>
+      <h1 className="mt-1 text-lg font-bold text-text">New NetworkPolicy</h1>
 
       <div className="mt-4">
         <PolicyForm value={draft} onChange={setDraft} namespaces={userNamespaces} />

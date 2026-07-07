@@ -99,7 +99,7 @@ export default function PolicyDetailPage() {
           <Link to="/policies" className="font-mono text-xs text-quiet hover:text-accent-strong">
             ← policies
           </Link>
-          <h1 className="mt-1 font-mono text-lg font-semibold text-text">
+          <h1 className="mt-1 text-lg font-bold text-text">
             <span className="text-muted">{namespace}/</span>
             {name}
           </h1>
