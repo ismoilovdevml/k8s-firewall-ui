@@ -58,10 +58,7 @@ Field semantics:
 1. **Default-allow, opt-in isolation.** A pod is non-isolated until some policy selects it; then it becomes **default-deny for that direction**.
 2. **Additive/union — policies never deny.** The allowed set is the union across all applicable policies; evaluation order is irrelevant. No priority, no explicit deny.
 3. **Both ends must permit.** A → B:port succeeds iff A's egress allows B AND B's ingress allows A.
-4. **`from: []` vs omitted `from`:**
-   - `ingress: [{ports: [...]}]`, `from` **omitted** → those ports from **all sources**.
-   - `from: []` (empty array) → matches **no sources** → effectively deny.
-   - `ingress: [{}]` (one empty rule) = **allow all ingress**; `ingress: []` / omitted with Ingress in policyTypes = **deny all ingress**.
+4. **Empty vs missing `from`/`to` — per the official API reference they are the SAME:** "If this field is empty or missing, this rule matches all sources (traffic not restricted by source)." So both omitted `from` and `from: []` match **all peers**. The meaningful distinction is at the *rule list* level: `ingress: [{}]` (one empty rule) = **allow all ingress**, while `ingress: []` / omitted (with Ingress in policyTypes) = **deny all ingress**. (Pin with a real-API test — plan risk #1.)
 5. **Node-local traffic always allowed** (kubelet probes etc.) regardless of policy.
 6. **Self-traffic** cannot be blocked.
 7. Canonical templates to ship as presets:

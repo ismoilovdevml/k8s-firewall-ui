@@ -51,7 +51,7 @@ Full reference: `docs/research/network-policy-semantics.md`. The rules below are
 2. **Isolation is per-direction, opt-in.** A pod is wide-open until some policy selects it for that direction (per `policyTypes`); then that direction is default-deny.
 3. **Connection allowed ⟺ source egress check AND destination ingress check** both pass. Report which side denies.
 4. **Peer AND/OR:** `podSelector` + `namespaceSelector` in the *same* `from`/`to` element = AND; *separate* elements = OR. Bare `podSelector` = policy's own namespace only; `namespaceSelector: {}` = all namespaces.
-5. **`from: []` matches no peers (deny); omitted `from` matches all peers.** Similarly `ingress: [{}]` = allow-all vs `ingress: []` = deny-all. Never conflate absent and empty.
+5. **Empty and missing `from`/`to` are the same: both match ALL peers** (official API reference: "empty or missing … matches all sources"). The rule-list level differs: `ingress: [{}]` = allow-all, `ingress: []`/omitted = deny-all.
 6. `policyTypes` defaults are surprising — always set explicitly when generating policies.
 7. Warnings the simulator must emit: hostNetwork pods (selectors don't match them; behavior undefined), node-local traffic always allowed, DNS egress trap (egress isolation without a :53 allow breaks DNS).
 8. flannel (alone) does NOT enforce NetworkPolicy — API accepts objects silently. Surface CNI warnings app-wide.

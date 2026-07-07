@@ -1,0 +1,13 @@
+# Local test cluster for k8s-firewall-ui.
+# Default CNI is disabled; Calico is installed instead so NetworkPolicies
+# are actually enforced (kindnet does not enforce them).
+#
+#   kind create cluster --name k8s-firewall-ui --config hack/kind-config.yaml
+#   kubectl --context kind-k8s-firewall-ui create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  disableDefaultCNI: true
+  podSubnet: 192.168.0.0/16
+nodes:
+  - role: control-plane

@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -9,10 +10,14 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/api"
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/cni"
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/kube"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/version"
 	"github.com/ismoilovdevml/k8s-firewall-ui/web"
 )
@@ -20,6 +25,8 @@ import (
 func main() {
 	var (
 		listen      = flag.String("listen", ":8080", "address to listen on")
+		kubeconfig  = flag.String("kubeconfig", "", "path to kubeconfig (default: $KUBECONFIG, in-cluster, then ~/.kube/config)")
+		cniOverride = flag.String("cni-override", "", "skip CNI auto-detection and trust this provider name")
 		showVersion = flag.Bool("version", false, "print version and exit")
 	)
 	flag.Parse()
@@ -29,21 +36,54 @@ func main() {
 		os.Exit(0)
 	}
 
+	if err := run(*listen, *kubeconfig, *cniOverride); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run(listen, kubeconfig, cniOverride string) error {
+	ctx := context.Background()
+
+	clientset, _, err := kube.NewClientset(kubeconfig)
+	if err != nil {
+		return err
+	}
+
+	serverVersion := "unknown"
+	if v, err := clientset.Discovery().ServerVersion(); err == nil {
+		serverVersion = v.GitVersion
+	} else {
+		log.Printf("warning: could not read server version: %v", err)
+	}
+
+	store, err := kube.NewStore(clientset)
+	if err != nil {
+		return err
+	}
+	log.Print("starting informers, waiting for cache sync...")
+	if err := store.Start(ctx); err != nil {
+		return err
+	}
+	log.Print("informer caches synced")
+
+	detectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	cniResult := cni.Detect(detectCtx, clientset, cniOverride)
+	cancel()
+	log.Printf("CNI detection: provider=%s enforcesPolicies=%v", cniResult.Provider, cniResult.EnforcesPolicies)
+	for _, warning := range cniResult.Warnings {
+		log.Printf("warning: %s", warning)
+	}
+
+	srv := api.NewServer(store, clientset, cniResult, serverVersion)
+
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
-
-	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
-
+	srv.Routes(r)
 	r.NotFound(spaHandler())
 
-	log.Printf("k8s-firewall-ui %s listening on %s", version.Version, *listen)
-	if err := http.ListenAndServe(*listen, r); err != nil {
-		log.Fatal(err)
-	}
+	log.Printf("k8s-firewall-ui %s listening on %s (cluster %s)", version.Version, listen, serverVersion)
+	return http.ListenAndServe(listen, r)
 }
 
 // spaHandler serves the embedded frontend. Unknown paths fall back to
