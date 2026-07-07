@@ -91,8 +91,8 @@ export default function BuilderPage() {
         id: `e-${card.id}`,
         source: '__target__',
         target: card.id,
-        style: { stroke: 'var(--color-accent)' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--color-accent)' },
+        style: { stroke: 'var(--color-accent-strong)' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--color-accent-strong)' },
       })),
     ]
     return { nodes: ns, edges: es }
@@ -146,13 +146,13 @@ export default function BuilderPage() {
           <div className="ml-auto flex gap-2">
             <button
               onClick={() => store.addPeer('ingress')}
-              className="rounded border border-allow/50 px-3 py-1.5 text-sm text-allow hover:bg-allow/10"
+              className="rounded border border-allow/50 px-3 py-1.5 text-sm text-accent-strong hover:bg-allow/10"
             >
               + Allow from…
             </button>
             <button
               onClick={() => store.addPeer('egress')}
-              className="rounded border border-accent/50 px-3 py-1.5 text-sm text-accent hover:bg-accent/10"
+              className="rounded border border-accent-strong/50 px-3 py-1.5 text-sm text-accent-strong hover:bg-accent-strong/10"
             >
               + Allow to…
             </button>
@@ -189,7 +189,7 @@ export default function BuilderPage() {
             onPaneClick={() => store.select(null)}
             fitView
             proOptions={{ hideAttribution: true }}
-            colorMode="dark"
+            colorMode="light"
             nodesDraggable={false}
             nodesConnectable={false}
           >

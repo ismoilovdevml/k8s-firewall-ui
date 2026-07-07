@@ -63,7 +63,7 @@ export default function TopologyPage() {
               onClick={() => toggle(ns.name)}
               className={`rounded-full border px-3 py-0.5 font-mono text-xs transition-colors ${
                 selected.includes(ns.name)
-                  ? 'border-accent/60 bg-accent/10 text-accent'
+                  ? 'border-accent/60 bg-accent/10 text-accent-strong'
                   : 'border-edge text-muted hover:border-quiet hover:text-text'
               }`}
             >
@@ -118,7 +118,7 @@ export default function TopologyPage() {
             onPaneClick={() => setActiveEdge(null)}
             fitView
             proOptions={{ hideAttribution: true }}
-            colorMode="dark"
+            colorMode="light"
           >
             <Background color="var(--color-edge)" gap={24} />
             <Controls showInteractive={false} />
@@ -126,7 +126,7 @@ export default function TopologyPage() {
         )}
 
         {activeEdge && (
-          <div className="absolute right-4 top-4 w-80 rounded-md border border-edge bg-surface p-4 shadow-xl shadow-black/40">
+          <div className="absolute right-4 top-4 w-80 rounded-md border border-edge bg-surface p-4 shadow-lg">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 font-mono text-xs text-muted">
                 <div className="truncate">{activeEdge.source.split('/').slice(1).join('/')}</div>
