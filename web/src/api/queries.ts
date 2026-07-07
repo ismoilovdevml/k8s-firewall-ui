@@ -49,6 +49,7 @@ export function usePolicyDetail(namespace: string, name: string) {
   return useQuery({
     queryKey: ['networkpolicies', namespace, name],
     queryFn: () => apiGet<PolicyDetail>(`/api/v1/namespaces/${namespace}/networkpolicies/${name}`),
+    enabled: namespace !== '' && name !== '',
   })
 }
 

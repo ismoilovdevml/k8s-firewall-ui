@@ -33,7 +33,8 @@ export default function YamlEditor({ value, onChange, readOnly = false }: Props)
       value={value}
       onChange={onChange}
       readOnly={readOnly}
-      extensions={[yaml(), theme]}
+      theme={theme}
+      extensions={[yaml()]}
       basicSetup={{ foldGutter: false, highlightActiveLine: !readOnly }}
       className="overflow-hidden rounded-md border border-edge"
     />

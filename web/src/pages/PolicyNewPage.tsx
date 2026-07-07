@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCreatePolicy, useNamespaces } from '../api/queries'
 import { ApiError } from '../api/client'
@@ -19,9 +19,12 @@ export default function PolicyNewPage() {
   const [feedback, setFeedback] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
 
   // Pick the first namespace once loaded.
-  if (draft.namespace === '' && userNamespaces.length > 0) {
-    setDraft({ ...draft, namespace: userNamespaces[0] })
-  }
+  useEffect(() => {
+    if (draft.namespace === '' && userNamespaces.length > 0) {
+      setDraft((d) => ({ ...d, namespace: userNamespaces[0] }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.namespace, userNamespaces.join(',')])
 
   const submit = (dryRun: boolean) => {
     create.mutate(
