@@ -33,6 +33,11 @@ interface SimResult {
   warnings?: { code: string; severity: string; message: string }[]
 }
 
+function sideWord(side: SideResult): string {
+  if (!side.applicable) return 'not evaluated'
+  return side.allowed ? 'pass' : 'deny'
+}
+
 export default function SimulatorPage() {
   const [src, setSrc] = useState<{ namespace: string; name: string }>({ namespace: '', name: '' })
   const [dstKind, setDstKind] = useState<'pod' | 'ip'>('pod')
@@ -90,7 +95,7 @@ export default function SimulatorPage() {
                   key={k}
                   onClick={() => setDstKind(k)}
                   className={`rounded px-2 py-0.5 ${
-                    dstKind === k ? 'bg-raised text-accent' : 'text-muted hover:text-text'
+                    dstKind === k ? 'bg-raised text-accent-strong' : 'text-muted hover:text-text'
                   }`}
                 >
                   {k === 'pod' ? 'pod' : 'external IP'}
@@ -156,13 +161,26 @@ export default function SimulatorPage() {
       {res && (
         <div className="mt-6">
           <div
-            className={`rounded-md border p-4 font-mono text-lg font-semibold ${
-              res.allowed
-                ? 'border-allow/40 bg-allow/10 text-allow'
-                : 'border-block/40 bg-block/10 text-block'
+            className={`flex items-center gap-4 rounded-xl border-2 p-5 ${
+              res.allowed ? 'border-allow bg-allow/10' : 'border-block bg-block/10'
             }`}
           >
-            {res.allowed ? '✓ Connection allowed' : '✗ Connection blocked'}
+            <span
+              aria-hidden
+              className={`text-3xl font-bold ${res.allowed ? 'text-accent-strong' : 'text-block'}`}
+            >
+              {res.allowed ? '✓' : '✕'}
+            </span>
+            <div>
+              <div
+                className={`text-xl font-bold ${res.allowed ? 'text-accent-strong' : 'text-block'}`}
+              >
+                {res.allowed ? 'Connection allowed' : 'Connection blocked'}
+              </div>
+              <div className="mt-0.5 text-sm text-muted">
+                source egress: {sideWord(res.egress)} · destination ingress: {sideWord(res.ingress)}
+              </div>
+            </div>
           </div>
 
           {res.warnings && res.warnings.length > 0 && (
@@ -170,13 +188,14 @@ export default function SimulatorPage() {
               {res.warnings.map((w) => (
                 <li
                   key={w.code + w.message}
-                  className={`rounded border px-3 py-2 text-sm ${
+                  className={`rounded-lg border px-3 py-2 text-sm ${
                     w.severity === 'warning'
-                      ? 'border-accent/40 bg-accent/5 text-accent'
+                      ? 'border-warn bg-warn-bg text-warn-text'
                       : 'border-edge bg-surface text-muted'
                   }`}
                 >
-                  <span className="font-mono text-[10px] uppercase">{w.code}</span> — {w.message}
+                  <span className="font-mono text-[10px] font-semibold uppercase">⚠ {w.code}</span> —{' '}
+                  {w.message}
                 </li>
               ))}
             </ul>
@@ -248,7 +267,7 @@ function SidePanel({ title, side }: { title: string; side: SideResult }) {
           <p className="mt-2 font-mono text-sm">
             {side.isolated ? (
               side.allowed ? (
-                <span className="text-allow">isolated — allowed by rule</span>
+                <span className="text-accent-strong">isolated — allowed by rule</span>
               ) : (
                 <span className="text-block">isolated — no rule matches (deny)</span>
               )
@@ -263,7 +282,7 @@ function SidePanel({ title, side }: { title: string; side: SideResult }) {
                   {m.explanation}{' '}
                   <Link
                     to={`/policies/${m.policy.namespace}/${m.policy.name}`}
-                    className="font-mono text-xs text-accent hover:underline"
+                    className="font-mono text-xs text-accent-strong hover:underline"
                   >
                     open →
                   </Link>
@@ -272,23 +291,23 @@ function SidePanel({ title, side }: { title: string; side: SideResult }) {
             </ul>
           )}
           {side.evaluatedPolicies && side.evaluatedPolicies.length > 0 && (
-            <div className="mt-3">
-              <div className="font-mono text-[10px] uppercase tracking-wide text-quiet">
-                policies evaluated
-              </div>
+            <details className="mt-3">
+              <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-quiet hover:text-muted">
+                policies evaluated ({side.evaluatedPolicies.length})
+              </summary>
               <ul className="mt-1 space-y-0.5">
                 {side.evaluatedPolicies.map((p) => (
                   <li key={`${p.namespace}/${p.name}`}>
                     <Link
                       to={`/policies/${p.namespace}/${p.name}`}
-                      className="font-mono text-xs text-muted hover:text-accent"
+                      className="font-mono text-xs text-muted hover:text-accent-strong"
                     >
                       {p.namespace}/{p.name}
                     </Link>
                   </li>
                 ))}
               </ul>
-            </div>
+            </details>
           )}
         </>
       )}
