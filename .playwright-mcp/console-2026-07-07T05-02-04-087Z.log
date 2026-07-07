@@ -1,3 +1,0 @@
-[  928600ms] [ERROR] Failed to load resource: net::ERR_NETWORK_IO_SUSPENDED @ http://localhost:18099/api/v1/events:0
-[ 1418665ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ http://localhost:18099/api/v1/events:0
-[ 1421667ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:18099/api/v1/events:0

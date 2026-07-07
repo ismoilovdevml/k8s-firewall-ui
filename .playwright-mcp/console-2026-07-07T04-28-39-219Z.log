@@ -1,3 +1,0 @@
-[  202724ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ http://localhost:18099/api/v1/events:0
-[  849349ms] [ERROR] Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING @ http://localhost:18099/api/v1/events:0
-[  852352ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:18099/api/v1/events:0

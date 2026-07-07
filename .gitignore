@@ -20,3 +20,6 @@ coverage.out
 # Env
 .env
 .env.*
+
+# Playwright MCP artifacts
+.playwright-mcp/
