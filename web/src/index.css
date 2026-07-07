@@ -1,25 +1,35 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Control-room palette: deep navy-slate base, firewall-amber accent,
-     semantic verdict colors (allow/block/quiet). */
-  --color-base: #0b1220;
-  --color-surface: #121a2b;
-  --color-raised: #1a2438;
-  --color-edge: #263049;
-  --color-text: #dce4f2;
-  --color-muted: #8093b0;
-  --color-accent: #ffa03e;
-  --color-allow: #3ecf8e;
-  --color-block: #f26d6d;
-  --color-quiet: #5d6b85;
+  /* Kiwi light palette: cream base, white surfaces, dark-teal sidebar,
+     teal accents. Block-red sits outside the green family on purpose so
+     allow/block never blend with the brand color. */
+  --color-base: #faf7f0;
+  --color-surface: #ffffff;
+  --color-raised: #f6f2e8;
+  --color-edge: #eee7d8;
+  --color-text: #0f2a24;
+  --color-muted: #64716c;
+  --color-quiet: #8a968f;
+  --color-accent: #0ab68b;
+  --color-accent-strong: #028174;
+  --color-on-accent: #04211d;
+  --color-allow: #0ab68b;
+  --color-block: #e05c52;
+  --color-warn: #d9a13f;
+  --color-warn-bg: #ffe3b3;
+  --color-warn-text: #7a5410;
+  --color-sidebar: #06373a;
+  --color-sidebar-text: #cfe8e0;
+  --color-sidebar-brand: #92de8b;
+  --color-sidebar-raised: #0a4a4e;
 
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -28,7 +38,6 @@ body {
   font-family: var(--font-sans);
 }
 
-/* React Flow dark theme adjustments */
 .react-flow__attribution {
   background: transparent;
   color: var(--color-quiet);
