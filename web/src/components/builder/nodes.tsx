@@ -9,7 +9,7 @@ export function TargetNode({ data }: NodeProps) {
   return (
     <div className="w-[230px] rounded-md border-2 border-accent/70 bg-raised px-3 py-2 shadow-sm">
       <Handle type="target" position={Position.Left} className="!bg-accent" />
-      <div className="font-mono text-[10px] uppercase tracking-wide text-accent">
+      <div className="font-mono text-[10px] uppercase tracking-wide text-accent-strong">
         policy target
       </div>
       <div className="mt-0.5 truncate font-mono text-sm font-semibold text-text">

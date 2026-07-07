@@ -56,7 +56,7 @@ export default function PolicyForm({ value, onChange, identityLocked, namespaces
             <button
               type="button"
               onClick={() => setRules(direction, [...rules, { peers: [], ports: [] }])}
-              className="rounded border border-edge px-3 py-1.5 text-xs text-muted hover:border-accent hover:text-accent"
+              className="rounded border border-edge px-3 py-1.5 text-xs text-muted hover:border-accent hover:text-accent-strong"
             >
               Add {direction} rule
             </button>

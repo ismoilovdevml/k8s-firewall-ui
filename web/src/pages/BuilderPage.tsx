@@ -159,7 +159,7 @@ export default function BuilderPage() {
             <button
               onClick={() => submit(true)}
               disabled={!ready || create.isPending}
-              className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent disabled:opacity-50"
+              className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong disabled:opacity-50"
             >
               Validate
             </button>
@@ -174,7 +174,7 @@ export default function BuilderPage() {
         </div>
 
         {feedback && (
-          <p className={`px-4 pt-2 font-mono text-xs ${feedback.tone === 'ok' ? 'text-allow' : 'text-block'}`}>
+          <p className={`px-4 pt-2 font-mono text-xs ${feedback.tone === 'ok' ? 'text-accent-strong' : 'text-block'}`}>
             {feedback.text}
           </p>
         )}
@@ -317,7 +317,7 @@ function LoadExisting() {
           </option>
         ))}
       </select>
-      {notice && <span className="ml-2 font-mono text-[10px] text-accent">{notice}</span>}
+      {notice && <span className="ml-2 font-mono text-[10px] text-warn-text">{notice}</span>}
     </label>
   )
 }

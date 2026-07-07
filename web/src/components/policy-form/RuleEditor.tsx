@@ -36,7 +36,7 @@ export default function RuleEditor({ value, direction, onChange, onRemove }: Pro
         {value.peers.length === 0 && (
           <p className="text-xs text-quiet">
             No peers — this rule allows traffic {direction === 'ingress' ? 'from' : 'to'}{' '}
-            <span className="text-accent">anywhere</span>.
+            <span className="text-accent-strong">anywhere</span>.
           </p>
         )}
         <div className="flex gap-2">
@@ -45,7 +45,7 @@ export default function RuleEditor({ value, direction, onChange, onRemove }: Pro
             onClick={() =>
               onChange({ ...value, peers: [...value.peers, { kind: 'pods', podSelector: {} }] })
             }
-            className="rounded border border-edge px-2 py-1 text-xs text-muted hover:border-accent hover:text-accent"
+            className="rounded border border-edge px-2 py-1 text-xs text-muted hover:border-accent hover:text-accent-strong"
           >
             Add peer
           </button>

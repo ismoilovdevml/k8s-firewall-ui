@@ -96,7 +96,7 @@ export default function PolicyDetailPage() {
     <div className="p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <Link to="/policies" className="font-mono text-xs text-quiet hover:text-accent">
+          <Link to="/policies" className="font-mono text-xs text-quiet hover:text-accent-strong">
             ← policies
           </Link>
           <h1 className="mt-1 font-mono text-lg font-semibold text-text">
@@ -119,7 +119,7 @@ export default function PolicyDetailPage() {
             onClick={() => (t.id === 'edit' ? startEdit() : (setTab(t.id), setFeedback(null)))}
             className={`px-3 py-2 font-mono text-xs ${
               tab === t.id
-                ? 'border-b-2 border-accent text-accent'
+                ? 'border-b-2 border-accent text-accent-strong'
                 : 'text-muted hover:text-text'
             }`}
           >
@@ -130,7 +130,7 @@ export default function PolicyDetailPage() {
 
       {feedback && (
         <p
-          className={`mt-3 font-mono text-xs ${feedback.tone === 'ok' ? 'text-allow' : 'text-block'}`}
+          className={`mt-3 font-mono text-xs ${feedback.tone === 'ok' ? 'text-accent-strong' : 'text-block'}`}
         >
           {feedback.text}
         </p>
@@ -169,7 +169,7 @@ export default function PolicyDetailPage() {
           (conversion.lossy.length > 0 ? (
             <div className="rounded-md border border-accent/40 bg-accent/5 p-4 text-sm text-text">
               <p>This policy uses features the form cannot edit:</p>
-              <ul className="mt-1 list-inside list-disc font-mono text-xs text-accent">
+              <ul className="mt-1 list-inside list-disc font-mono text-xs text-accent-strong">
                 {conversion.lossy.map((l) => (
                   <li key={l}>{l}</li>
                 ))}
@@ -280,7 +280,7 @@ function ApplyBar({
       <button
         onClick={onValidate}
         disabled={busy}
-        className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent disabled:opacity-50"
+        className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong disabled:opacity-50"
       >
         Validate (dry-run)
       </button>
