@@ -4,7 +4,7 @@ import { errorMessage } from '../api/client'
 import { useAudit, useMe } from '../api/queries'
 import type { AuditEntry } from '../api/types'
 import { Badge, PageHeader, Spinner } from '../components/ui'
-import { lineDiff } from '../policy/diff'
+import DiffView from '../components/DiffView'
 
 const inputCls =
   'rounded border border-edge bg-surface px-2 py-1.5 font-mono text-xs text-text placeholder:text-quiet focus:border-accent focus:outline-none'
@@ -120,26 +120,10 @@ function Row({ e, open, onToggle }: { e: AuditEntry; open: boolean; onToggle: ()
         <tr>
           <td colSpan={6} className="bg-base px-4 py-3">
             {e.error && <p className="mb-2 font-mono text-xs text-block">{e.error}</p>}
-            <Diff before={e.before ?? ''} after={e.after ?? ''} />
+            <DiffView before={e.before ?? ''} after={e.after ?? ''} />
           </td>
         </tr>
       )}
     </>
-  )
-}
-
-function Diff({ before, after }: { before: string; after: string }) {
-  if (!before && !after) return <p className="text-xs text-muted">No content recorded.</p>
-  return (
-    <pre className="max-h-96 overflow-auto rounded-lg border border-edge bg-surface p-3 font-mono text-[11px] leading-5">
-      {lineDiff(before, after).map((l, i) => (
-        <div
-          key={i}
-          className={l.op === '+' ? 'bg-accent/10 text-accent-strong' : l.op === '-' ? 'bg-block/10 text-block' : 'text-muted'}
-        >
-          {l.op === '=' ? ' ' : l.op} {l.text}
-        </div>
-      ))}
-    </pre>
   )
 }

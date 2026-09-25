@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { draftToPolicy, policyToDraft } from './model'
 import { TEMPLATES, findTemplate } from './templates'
-import { lineDiff } from './diff'
+import { compactDiff, lineDiff } from './diff'
 
 describe('policy templates', () => {
   it.each(TEMPLATES.map((t) => [t.id, t] as const))('%s produces a valid, lossless policy', (_, t) => {
@@ -43,5 +43,21 @@ describe('lineDiff', () => {
   it('handles creation and deletion', () => {
     expect(lineDiff('', 'x')).toEqual([{ op: '+', text: 'x' }])
     expect(lineDiff('x', '')).toEqual([{ op: '-', text: 'x' }])
+  })
+})
+
+describe('compactDiff', () => {
+  it('keeps changes with context and collapses the rest', () => {
+    const before = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].join('\n')
+    const after = ['a', 'b', 'c', 'd', 'X', 'f', 'g', 'h', 'i'].join('\n')
+    const out = compactDiff(lineDiff(before, after), 1)
+    expect(out.map((l) => `${l.op}${l.text}`)).toEqual([
+      'gap3 unchanged lines',
+      '=d',
+      '-e',
+      '+X',
+      '=f',
+      'gap3 unchanged lines',
+    ])
   })
 })

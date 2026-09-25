@@ -10,6 +10,7 @@ import { draftToPolicy, policyToDraft } from '../policy/model'
 import { useCreatePolicy, useNamespaces, usePolicies, usePolicyDetail } from '../api/queries'
 import { ApiError } from '../api/client'
 import YamlEditor from '../components/YamlEditor'
+import ImpactPanel from '../components/ImpactPanel'
 import LabelMapEditor from '../components/policy-form/LabelMapEditor'
 import PeerEditor from '../components/policy-form/PeerEditor'
 import PortListEditor from '../components/policy-form/PortListEditor'
@@ -48,7 +49,8 @@ export default function BuilderPage() {
     [store.name, store.namespace, store.podSelector, store.ingressEnabled, store.egressEnabled, store.peers],
   )
 
-  const yamlPreview = useMemo(() => stringify(draftToPolicy(draft)), [draft])
+  const policy = useMemo(() => draftToPolicy(draft), [draft])
+  const yamlPreview = useMemo(() => stringify(policy), [policy])
 
   const { nodes, edges } = useMemo(() => {
     const ingress = store.peers.filter((p) => p.direction === 'ingress')
@@ -266,6 +268,11 @@ export default function BuilderPage() {
               </div>
             </div>
           )}
+        </div>
+        <div className="border-t border-edge p-3">
+          <ImpactPanel
+            request={draft.name && draft.namespace ? { operation: 'apply', namespace: draft.namespace, policy } : null}
+          />
         </div>
         <div className="border-t border-edge p-3">
           <div className="mb-1.5 font-mono text-[10px] uppercase tracking-wide text-quiet">

@@ -49,7 +49,9 @@ export default function ImpactPanel({ request, auto }: { request: ImpactRequest 
           </p>
           {res.newlyBlocked.length === 0 && res.newlyAllowed.length === 0 && (
             <p className="text-xs text-muted">
-              No reachability changes between existing workloads. (Traffic to/from external IPs is not included.)
+              No reachability changes between existing workloads. The preview compares any-port reachability, so
+              port-only changes and traffic to/from external IPs are not reflected — use the simulator for a
+              specific port.
             </p>
           )}
           <EdgeList title="newly blocked" tone="text-block" edges={res.newlyBlocked} />

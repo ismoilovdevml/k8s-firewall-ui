@@ -34,3 +34,27 @@ export function lineDiff(before: string, after: string): DiffLine[] {
   while (j < b.length) out.push({ op: '+', text: b[j++] })
   return out
 }
+
+export type HunkLine = DiffLine | { op: 'gap'; text: string }
+
+/** Keeps only changed lines plus `context` lines around them, like `diff -U`. */
+export function compactDiff(lines: DiffLine[], context = 3): HunkLine[] {
+  const keep = new Array<boolean>(lines.length).fill(false)
+  lines.forEach((l, i) => {
+    if (l.op === '=') return
+    for (let j = Math.max(0, i - context); j <= Math.min(lines.length - 1, i + context); j++) keep[j] = true
+  })
+  const out: HunkLine[] = []
+  let skipped = 0
+  lines.forEach((l, i) => {
+    if (keep[i]) {
+      if (skipped > 0) out.push({ op: 'gap', text: `${skipped} unchanged line${skipped === 1 ? '' : 's'}` })
+      skipped = 0
+      out.push(l)
+    } else {
+      skipped++
+    }
+  })
+  if (skipped > 0 && out.length > 0) out.push({ op: 'gap', text: `${skipped} unchanged line${skipped === 1 ? '' : 's'}` })
+  return out
+}

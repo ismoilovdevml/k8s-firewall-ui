@@ -172,3 +172,24 @@ test('a read-only user cannot change policies', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Create policy' })).toBeDisabled()
   await signOut(page)
 })
+
+test('editing shows a review diff and impact before applying', async ({ page }) => {
+  await page.goto('/policies/shop/cart-to-redis')
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
+  const port = page.locator('input[value="6379"]').first()
+  await port.fill('6380')
+  await expect(page.getByText('review changes')).toBeVisible()
+  await expect(page.locator('pre').getByText(/^- +port: 6379$/)).toBeVisible()
+  await expect(page.locator('pre').getByText(/^\+ +port: 6380$/)).toBeVisible()
+  await page.getByRole('button', { name: 'Preview impact' }).click()
+  await expect(page.getByText(/Affects 1 workload/)).toBeVisible()
+  await page.screenshot({ path: 'e2e-results/shots/edit-review.png', fullPage: true })
+  // Leave the cluster untouched: validate only.
+  await page.getByRole('button', { name: 'Validate (dry-run)' }).click()
+  await expect(page.getByText('Valid — the API server accepts this policy.')).toBeVisible()
+})
+
+test('builder previews impact while drawing', async ({ page }) => {
+  await page.goto('/builder')
+  await expect(page.getByText('impact preview')).toBeVisible()
+})

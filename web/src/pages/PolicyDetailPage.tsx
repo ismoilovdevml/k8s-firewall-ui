@@ -8,6 +8,8 @@ import { isolationText, ruleText } from '../policy/describe'
 import YamlEditor from '../components/YamlEditor'
 import PolicyForm from '../components/policy-form/PolicyForm'
 import ImpactPanel from '../components/ImpactPanel'
+import DiffView from '../components/DiffView'
+import { stringify } from 'yaml'
 import { PolicyFindingsCard } from '../components/PolicyFindings'
 
 type Tab = 'overview' | 'edit' | 'yaml' | 'pods'
@@ -196,6 +198,10 @@ export default function PolicyDetailPage() {
             draft && (
               <div>
                 <PolicyForm value={draft} onChange={setDraft} identityLocked />
+                <ReviewChanges
+                  before={stringify(draftToPolicy(conversion.draft))}
+                  after={draftPolicy ? stringify(draftPolicy) : ''}
+                />
                 <ApplyBar
                   busy={update.isPending}
                   denied={perms?.update === false}
@@ -212,6 +218,7 @@ export default function PolicyDetailPage() {
         {tab === 'yaml' && (
           <div>
             <YamlEditor value={yamlText} onChange={setYamlText} />
+            <ReviewChanges before={data.yaml} after={yamlText} />
             <ApplyBar
               busy={update.isPending}
               denied={perms?.update === false}
@@ -322,6 +329,20 @@ function ApplyBar({
         Apply
       </button>
     </div>
+  )
+}
+
+function ReviewChanges({ before, after }: { before: string; after: string }) {
+  if (before === after) return null
+  return (
+    <details className="mt-3" open>
+      <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-wide text-quiet hover:text-muted">
+        review changes
+      </summary>
+      <div className="mt-2">
+        <DiffView before={before} after={after} onlyChanges />
+      </div>
+    </details>
   )
 }
 
