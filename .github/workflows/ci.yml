@@ -110,8 +110,11 @@ jobs:
         run: |
           curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.33.4+k3s1 \
             INSTALL_K3S_EXEC="--disable=traefik --disable=metrics-server --write-kubeconfig-mode=644" sh -
-          echo "KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> "$GITHUB_ENV"
-          for i in $(seq 1 60); do kubectl get nodes 2>/dev/null | grep -q " Ready" && break; sleep 2; done
+          # GITHUB_ENV applies to later steps only; export for this one too.
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          echo "KUBECONFIG=$KUBECONFIG" >> "$GITHUB_ENV"
+          for i in $(seq 1 90); do kubectl get nodes 2>/dev/null | grep -q " Ready" && break; sleep 2; done
+          for i in $(seq 1 60); do kubectl -n kube-system get pod -l k8s-app=kube-dns -o name 2>/dev/null | grep -q pod && break; sleep 2; done
           kubectl -n kube-system wait --for=condition=Ready pod -l k8s-app=kube-dns --timeout=180s
       - name: Install Playwright
         working-directory: web
