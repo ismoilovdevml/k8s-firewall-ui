@@ -59,6 +59,13 @@ func WithPolicy(snap *Snapshot, namespace, name string, proposed *networkingv1.N
 	return out
 }
 
+// PolicyChange replaces the policy Namespace/Name with Proposed, or deletes
+// it when Proposed is nil.
+type PolicyChange struct {
+	Namespace, Name string
+	Proposed        *networkingv1.NetworkPolicy
+}
+
 // Impact computes which workload connections change reachability if the
 // policy namespace/name is replaced by proposed (nil = deleted). A policy can
 // only change checks whose subject it selects, so only edges into and out of
@@ -67,25 +74,46 @@ func WithPolicy(snap *Snapshot, namespace, name string, proposed *networkingv1.N
 // Reachability is "not blocked": allowed and unconstrained both reach, so a
 // flip between those two is not reported.
 func Impact(snap *Snapshot, namespace, name string, proposed *networkingv1.NetworkPolicy) ImpactResult {
-	after := WithPolicy(snap, namespace, name, proposed)
-	var old *networkingv1.NetworkPolicy
-	for _, pol := range snap.Policies {
-		if pol.Namespace == namespace && pol.Name == name {
-			old = pol
-		}
+	return ImpactMany(snap, []PolicyChange{{Namespace: namespace, Name: name, Proposed: proposed}})
+}
+
+// ApplyChanges returns the snapshot after all changes, in order.
+func ApplyChanges(snap *Snapshot, changes []PolicyChange) *Snapshot {
+	out := snap
+	for _, c := range changes {
+		out = WithPolicy(out, c.Namespace, c.Name, c.Proposed)
 	}
-	var normalized *networkingv1.NetworkPolicy
-	if proposed != nil {
-		normalized = NormalizePolicy(proposed)
+	return out
+}
+
+// ImpactMany is Impact for a set of changes applied together (e.g. every
+// manifest in a pull request).
+func ImpactMany(snap *Snapshot, changes []PolicyChange) ImpactResult {
+	after := ApplyChanges(snap, changes)
+
+	// Every version (old and new) of every changed policy.
+	var involved []*networkingv1.NetworkPolicy
+	for _, c := range changes {
+		for _, pol := range snap.Policies {
+			if pol.Namespace == c.Namespace && pol.Name == c.Name {
+				involved = append(involved, pol)
+			}
+		}
+		if c.Proposed != nil {
+			involved = append(involved, NormalizePolicy(c.Proposed))
+		}
 	}
 
 	workloads := Workloads(snap, nil)
 	selected := map[string]bool{}
 	res := ImpactResult{SelectedWorkloads: []string{}, NewlyBlocked: []ImpactEdge{}, NewlyAllowed: []ImpactEdge{}}
 	for _, wl := range workloads {
-		if (old != nil && selects(old, wl)) || (normalized != nil && selects(normalized, wl)) {
-			selected[wl.ID] = true
-			res.SelectedWorkloads = append(res.SelectedWorkloads, wl.ID)
+		for _, pol := range involved {
+			if selects(pol, wl) {
+				selected[wl.ID] = true
+				res.SelectedWorkloads = append(res.SelectedWorkloads, wl.ID)
+				break
+			}
 		}
 	}
 

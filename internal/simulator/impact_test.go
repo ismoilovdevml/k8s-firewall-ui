@@ -163,3 +163,20 @@ func TestNormalizePolicyKeepsExplicitTypes(t *testing.T) {
 		t.Fatal("NormalizePolicy mutated its input")
 	}
 }
+
+func TestImpactManyCombinesChanges(t *testing.T) {
+	denyAllB := policy("b", "deny-all", networkingv1.NetworkPolicySpec{
+		PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+	})
+	allowWeb := ingressPolicy("b", "allow-web", map[string]string{"app": "db"},
+		networkingv1.NetworkPolicyIngressRule{From: []networkingv1.NetworkPolicyPeer{{
+			NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"team": "alpha"}},
+		}}})
+	// Adding default-deny and the allow together only blocks kube-system.
+	res := ImpactMany(impactSnap(), []PolicyChange{
+		{Namespace: "b", Name: "deny-all", Proposed: denyAllB},
+		{Namespace: "b", Name: "allow-web", Proposed: allowWeb},
+	})
+	assertEdges(t, "NewlyBlocked", res.NewlyBlocked, []string{"kube-system/deployment/coredns->b/statefulset/db"})
+	assertEdges(t, "NewlyAllowed", res.NewlyAllowed, nil)
+}
