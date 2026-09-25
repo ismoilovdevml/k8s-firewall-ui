@@ -66,7 +66,8 @@ jobs:
       - run: >-
           helm template test deploy/helm/k8s-firewall-ui --set tls.enabled=true --set tls.secretName=tls
           --set metrics.serviceMonitor.enabled=true --set podDisruptionBudget.enabled=true
-          --set replicaCount=2 --set ingress.enabled=true > /dev/null
+          --set replicaCount=2 --set ingress.enabled=true
+          --set notifications.enabled=true --set notifications.existingSecret=hook > /dev/null
 
   smoke:
     runs-on: ubuntu-latest

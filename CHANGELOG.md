@@ -10,6 +10,8 @@
 - **Import / export**: clean multi-document YAML export, and a dry-run-first bulk import that reports created / updated / unchanged per policy.
 - **Authentication**: `--auth-mode=token` (sign in with a Kubernetes token) and `--auth-mode=proxy` (SSO via oauth2-proxy, Pomerium, …). Writes run as the signed-in user (own token or impersonation), so Kubernetes RBAC decides who may change what; the UI disables actions you cannot perform.
 - **Multi-tenant read scoping** (`--restrict-reads`, Helm `auth.restrictReads`): each user sees only namespaces where their RBAC allows listing NetworkPolicies, across lists, findings, topology, impact, the simulator and the audit log. Hidden namespaces answer 404; verdicts are still computed over the whole cluster.
+- **Compliance report**: download the posture report as Markdown, CSV (findings) or JSON.
+- **Change notifications**: `--notify-webhook-url` posts every policy change to Slack-compatible webhooks (`--notify-format=slack`) or as JSON to any endpoint, asynchronously with retries.
 - **Audit log**: every change with user, groups, source IP, result and a before/after YAML diff, both as structured logs and on an in-app page.
 - **Namespace topology**: a map of reachability between every pair of namespaces (open / partial / blocked / unrestricted) that drills down into the workload graph; the workload graph filters by verdict.
 - **Operations**: Prometheus `/metrics` (posture score, findings, coverage, HTTP, mutations), JSON logs, graceful shutdown, optional TLS, strict security headers and CSP, CSRF protection, sign-in rate limiting, `FWUI_*` environment variables for every flag.

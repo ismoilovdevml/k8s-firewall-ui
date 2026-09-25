@@ -69,6 +69,9 @@ spec:
             - --tls-cert-file=/etc/k8s-firewall-ui/tls/tls.crt
             - --tls-key-file=/etc/k8s-firewall-ui/tls/tls.key
             {{- end }}
+            {{- if .Values.notifications.enabled }}
+            - --notify-format={{ .Values.notifications.format }}
+            {{- end }}
             {{- range .Values.extraArgs }}
             - {{ . }}
             {{- end }}
@@ -79,6 +82,13 @@ spec:
                 secretKeyRef:
                   name: {{ include "k8s-firewall-ui.sessionSecretName" . }}
                   key: {{ .Values.auth.existingSecretKey }}
+            {{- end }}
+            {{- if .Values.notifications.enabled }}
+            - name: FWUI_NOTIFY_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "notifications.existingSecret is required when notifications.enabled" .Values.notifications.existingSecret }}
+                  key: {{ .Values.notifications.existingSecretKey }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

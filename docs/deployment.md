@@ -173,8 +173,31 @@ Every change made through the UI is recorded:
   is per replica.
 - in token/proxy modes, the Kubernetes API audit log also records the end
   user as the author of the request.
+- optionally, as a webhook notification (see above).
+
+A downloadable **posture report** (Markdown, CSV of findings, or JSON) is
+available from the Overview page or `GET /api/v1/posture/report?format=md|csv|json`,
+for compliance evidence.
 
 Dry-runs are not audited.
+
+### Notifications
+
+Send every change to Slack (or Teams/Mattermost via their Slack-compatible
+webhooks), or the full audit entry as JSON to any HTTP endpoint (e.g. a
+SIEM collector):
+
+```bash
+kubectl -n k8s-firewall-ui create secret generic firewall-ui-webhook \
+  --from-literal=webhook-url=https://hooks.slack.com/services/…
+helm upgrade firewall-ui deploy/helm/k8s-firewall-ui --reuse-values \
+  --set notifications.enabled=true --set notifications.existingSecret=firewall-ui-webhook
+```
+
+Delivery is asynchronous and retried three times, with backoff on network
+errors, 429 and 5xx responses. It never delays or fails the change itself.
+With `networkPolicy.enabled`, allow egress to the webhook via
+`networkPolicy.extraEgress`.
 
 ## 7. Hardening checklist
 
@@ -211,6 +234,8 @@ Every flag can also be set as an environment variable `FWUI_<FLAG>` (dashes beco
 | `--secure-cookies` | `false` | force `Secure` cookies (automatic with TLS) |
 | `--metrics` | `true` | expose `/metrics` |
 | `--audit-buffer` | `1000` | audit entries kept in memory |
+| `--notify-webhook-url` | | POST every change to this URL (use `FWUI_NOTIFY_WEBHOOK_URL`) |
+| `--notify-format` | `json` | `json` (audit entry) \| `slack` (text) |
 | `--log-format` | `text` | `text` \| `json` |
 | `--log-level` | `info` | `debug` \| `info` \| `warn` \| `error` |
 | `--shutdown-timeout` | `15s` | graceful shutdown timeout |

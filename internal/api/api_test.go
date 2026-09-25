@@ -399,3 +399,32 @@ func TestRestrictReadsHidesOtherTenants(t *testing.T) {
 		t.Errorf("me = %s", w.Body)
 	}
 }
+
+func TestPostureReportDownloads(t *testing.T) {
+	h := newHarness(t, false, nil, denyAll("b"))
+	cases := []struct {
+		format, contentType, mustHave string
+	}{
+		{"", "text/markdown", "# NetworkPolicy posture report"},
+		{"md", "text/markdown", "| b | 1 | 1 | 100% |"},
+		{"csv", "text/csv", "severity,code,namespace,policy,message"},
+		{"json", "application/json", `"generatedAt"`},
+	}
+	for _, tc := range cases {
+		t.Run("format="+tc.format, func(t *testing.T) {
+			w := h.do(http.MethodGet, "/api/v1/posture/report?format="+tc.format, "")
+			if w.Code != http.StatusOK || !strings.HasPrefix(w.Header().Get("Content-Type"), tc.contentType) {
+				t.Fatalf("status %d type %q", w.Code, w.Header().Get("Content-Type"))
+			}
+			if !strings.Contains(w.Header().Get("Content-Disposition"), "attachment") {
+				t.Errorf("not a download: %q", w.Header().Get("Content-Disposition"))
+			}
+			if !strings.Contains(w.Body.String(), tc.mustHave) {
+				t.Errorf("missing %q in:\n%s", tc.mustHave, w.Body)
+			}
+		})
+	}
+	if w := h.do(http.MethodGet, "/api/v1/posture/report?format=pdf", ""); w.Code != http.StatusBadRequest {
+		t.Errorf("unknown format status %d", w.Code)
+	}
+}

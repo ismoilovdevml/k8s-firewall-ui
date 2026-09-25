@@ -7,8 +7,10 @@ func TestResultCache(t *testing.T) {
 	calls := 0
 	compute := func() any { calls++; return calls }
 
-	if c.get(1, "a", compute) != 1 || c.get(1, "a", compute) != 1 {
-		t.Fatal("same generation must hit")
+	first := c.get(1, "a", compute)
+	second := c.get(1, "a", compute)
+	if first != 1 || second != 1 || calls != 1 {
+		t.Fatalf("same generation must hit: %v %v after %d computes", first, second, calls)
 	}
 	if c.get(2, "a", compute) != 2 {
 		t.Fatal("a new generation must recompute")

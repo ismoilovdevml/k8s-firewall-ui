@@ -53,6 +53,14 @@ audit:
   # record is the structured log stream (every entry has audit=true).
   bufferSize: 1000
 
+# Post every policy change made through the UI to a webhook. The URL of a
+# Slack/Teams incoming webhook is a credential: keep it in a Secret.
+notifications:
+  enabled: false
+  format: slack        # slack (text) | json (full audit entry, e.g. for a SIEM)
+  existingSecret: ""   # Secret holding the URL
+  existingSecretKey: webhook-url
+
 metrics:
   enabled: true
   serviceMonitor:
@@ -79,6 +87,10 @@ networkPolicy:
   apiServerCIDRs:
     - 0.0.0.0/0
   apiServerPorts: [443, 6443]
+  # Additional egress rules, e.g. to reach a notification webhook:
+  #   - to: [{ipBlock: {cidr: 0.0.0.0/0}}]
+  #     ports: [{protocol: TCP, port: 443}]
+  extraEgress: []
 
 service:
   type: ClusterIP

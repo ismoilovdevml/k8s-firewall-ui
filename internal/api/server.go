@@ -145,6 +145,7 @@ func (s *Server) Routes(r chi.Router) {
 			r.Post("/simulate", s.handleSimulate)
 			r.Post("/impact", s.handleImpact)
 			r.Get("/posture", s.handlePosture)
+			r.Get("/posture/report", s.handlePostureReport)
 			r.Get("/topology", s.handleTopology)
 			r.Get("/audit", s.handleAudit)
 			r.Get("/events", s.hub.serveHTTP)

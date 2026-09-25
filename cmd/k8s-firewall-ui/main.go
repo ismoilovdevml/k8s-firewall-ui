@@ -26,6 +26,7 @@ import (
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/cni"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/demo"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/kube"
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/notify"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/version"
 	"github.com/ismoilovdevml/k8s-firewall-ui/web"
 )
@@ -50,6 +51,8 @@ type config struct {
 	shutdownTimeout   time.Duration
 	demo              bool
 	restrictReads     bool
+	notifyURL         string
+	notifyFormat      string
 }
 
 func main() {
@@ -73,6 +76,8 @@ func main() {
 	flags.StringVar(&c.logFormat, "log-format", "text", "log format: text | json")
 	flags.StringVar(&c.logLevel, "log-level", "info", "log level: debug | info | warn | error")
 	flags.DurationVar(&c.shutdownTimeout, "shutdown-timeout", 15*time.Second, "graceful shutdown timeout")
+	flags.StringVar(&c.notifyURL, "notify-webhook-url", "", "POST every policy change to this webhook (prefer FWUI_NOTIFY_WEBHOOK_URL: the URL is a secret)")
+	flags.StringVar(&c.notifyFormat, "notify-format", "json", "webhook payload: json (audit entry) | slack (Slack-compatible text)")
 	flags.BoolVar(&c.restrictReads, "restrict-reads", false, "token/proxy mode: show each user only namespaces where they may list NetworkPolicies")
 	flags.BoolVar(&c.demo, "demo", false, "run against a built-in in-memory sample cluster (no Kubernetes needed)")
 	showVersion := flags.Bool("version", false, "print version and exit")
@@ -206,10 +211,22 @@ func run(ctx context.Context, c config, logger *slog.Logger) error {
 		return err
 	}
 
+	auditLog := audit.New(c.auditSize, logger)
+	var webhook *notify.Webhook
+	if c.notifyURL != "" {
+		format, err := notify.ParseFormat(c.notifyFormat)
+		if err != nil {
+			return err
+		}
+		webhook = notify.NewWebhook(c.notifyURL, format, logger)
+		auditLog.AddSink(webhook.Send)
+		logger.Info("policy change notifications enabled", "format", format)
+	}
+
 	metrics := api.NewMetrics(store)
 	srv := api.NewServer(api.Options{
 		Store: store, Clientset: clientset, CNI: cniResult, K8sVersion: serverVersion,
-		ReadOnly: c.readOnly, Auth: authn, Audit: audit.New(c.auditSize, logger),
+		ReadOnly: c.readOnly, Auth: authn, Audit: auditLog,
 		Logger: logger, Metrics: metrics,
 	})
 
@@ -259,7 +276,11 @@ func run(ctx context.Context, c config, logger *slog.Logger) error {
 	logger.Info("shutting down")
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), c.shutdownTimeout)
 	defer cancelShutdown()
-	return httpServer.Shutdown(shutdownCtx)
+	err = httpServer.Shutdown(shutdownCtx)
+	if webhook != nil {
+		webhook.Close(shutdownCtx) // deliver queued notifications
+	}
+	return err
 }
 
 // spaHandler serves the embedded frontend. Unknown paths fall back to

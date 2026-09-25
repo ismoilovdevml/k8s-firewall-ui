@@ -33,6 +33,11 @@ test('overview reports posture and the planted mistakes', async ({ page }) => {
   await expect(page.getByText('PEER_MATCHES_NOTHING')).toBeVisible()
   await page.getByLabel('Filter findings by severity').selectOption('all')
 
+  // The compliance report downloads as Markdown.
+  const dl = page.waitForEvent('download')
+  await page.getByRole('link', { name: 'Markdown' }).click()
+  expect((await dl).suggestedFilename()).toMatch(/^networkpolicy-posture-\d{8}-\d{4}\.md$/)
+
   // Drill into a namespace: every shop pod is isolated by named policies.
   await page.getByRole('button', { name: /shop/ }).click()
   await expect(page.getByRole('link', { name: 'default-deny-all' }).first()).toBeVisible()

@@ -37,9 +37,24 @@ export default function OverviewPage() {
         title="Security overview"
         subtitle="How well the cluster's NetworkPolicies isolate workloads, and what to fix first. Figures cover application pods (system namespaces and hostNetwork pods excluded)."
         actions={
-          <Link to="/policies/new">
-            <Button variant="primary">New policy</Button>
-          </Link>
+          <>
+            <div className="flex items-center overflow-hidden rounded border border-edge bg-surface text-sm">
+              <span className="px-2.5 py-1.5 text-muted">Report</span>
+              {(['md', 'csv', 'json'] as const).map((f) => (
+                <a
+                  key={f}
+                  href={`/api/v1/posture/report?format=${f}`}
+                  download
+                  className="border-l border-edge px-2.5 py-1.5 font-mono text-xs text-accent-strong hover:bg-raised"
+                >
+                  {f === 'md' ? 'Markdown' : f.toUpperCase()}
+                </a>
+              ))}
+            </div>
+            <Link to="/policies/new">
+              <Button variant="primary">New policy</Button>
+            </Link>
+          </>
         }
       />
 

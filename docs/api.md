@@ -97,6 +97,8 @@ Response: `{selectedWorkloads, newlyBlocked: [{source, target, before, after}], 
 - `namespaces[]`: pods, hostNetworkPods, policies, ingress/egress isolated pods, `defaultDenyIngress/Egress`.
 - `findings[]`: `{code, severity: critical|warning|info, namespace, policy?, message}`. Codes: `CNI_NOT_ENFORCING`, `CNI_UNVERIFIED`, `DNS_EGRESS_BLOCKED`, `NAMESPACE_UNPROTECTED`, `PODS_NOT_ISOLATED`, `POLICY_SELECTS_NOTHING`, `PEER_MATCHES_NOTHING`, `ALLOW_ALL_INGRESS`, `ALLOW_ALL_EGRESS`, `IPBLOCK_ANY`, `HOSTNETWORK_SELECTED`. Findings in `kube-*` namespaces are downgraded one severity step.
 
+`GET /api/v1/posture/report?format=md|csv|json` → the same report as a downloadable file (Markdown summary, CSV of findings, or JSON with cluster metadata).
+
 `GET /api/v1/namespaces/{ns}/isolation` → each pod with the `ingressPolicies` and `egressPolicies` isolating it.
 
 ## Audit

@@ -43,4 +43,7 @@ spec:
         - protocol: TCP
           port: {{ . }}
         {{- end }}
+    {{- with .Values.networkPolicy.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 {{- end }}

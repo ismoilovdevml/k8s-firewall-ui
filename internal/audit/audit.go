@@ -47,7 +47,12 @@ type Log struct {
 	full   bool
 	seq    int64
 	logger *slog.Logger
+	sinks  []func(Entry)
 }
+
+// AddSink registers fn to receive every recorded entry (e.g. a webhook
+// notifier). Sinks must not block. Register before serving traffic.
+func (l *Log) AddSink(fn func(Entry)) { l.sinks = append(l.sinks, fn) }
 
 // New creates a Log keeping the last size entries in memory.
 func New(size int, logger *slog.Logger) *Log {
@@ -96,6 +101,9 @@ func (l *Log) Record(e Entry) Entry {
 		"id", e.ID, "user", e.User, "groups", e.Groups, "sourceIP", e.SourceIP,
 		"action", e.Action, "namespace", e.Namespace, "name", e.Name,
 		"result", e.Result, "error", e.Error)
+	for _, sink := range l.sinks {
+		sink(e)
+	}
 	return e
 }
 
