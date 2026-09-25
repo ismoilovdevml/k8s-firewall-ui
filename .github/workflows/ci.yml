@@ -61,3 +61,33 @@ jobs:
       - run: helm lint deploy/helm/k8s-firewall-ui
       - run: helm template test deploy/helm/k8s-firewall-ui > /dev/null
       - run: helm template test deploy/helm/k8s-firewall-ui --set readOnly=true > /dev/null
+      - run: helm template test deploy/helm/k8s-firewall-ui --set auth.mode=token > /dev/null
+      - run: helm template test deploy/helm/k8s-firewall-ui --set auth.mode=proxy --set networkPolicy.enabled=true > /dev/null
+      - run: >-
+          helm template test deploy/helm/k8s-firewall-ui --set tls.enabled=true --set tls.secretName=tls
+          --set metrics.serviceMonitor.enabled=true --set podDisruptionBudget.enabled=true
+          --set replicaCount=2 --set ingress.enabled=true > /dev/null
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build
+        run: make build
+      - name: Run demo server and probe the API
+        run: |
+          ./bin/k8s-firewall-ui --demo --listen :8080 &
+          for i in $(seq 1 30); do curl -sf localhost:8080/readyz && break; sleep 1; done
+          curl -sf localhost:8080/api/v1/posture | grep -q '"score"'
+          curl -sf localhost:8080/ | grep -q '<div id="root">'
+          curl -sf localhost:8080/metrics | grep -q fwui_posture_score
+          # writes without the CSRF header are rejected
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8080/api/v1/simulate -d '{}')" = 403

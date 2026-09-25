@@ -2,7 +2,7 @@ BINARY := bin/k8s-firewall-ui
 VERSION ?= dev
 LDFLAGS := -s -w -X github.com/ismoilovdevml/k8s-firewall-ui/internal/version.Version=$(VERSION)
 
-.PHONY: all web backend build run dev test test-web lint lint-web docker helm-lint clean
+.PHONY: all web backend build run demo dev test test-web lint lint-web docker helm-lint clean
 
 all: build
 
@@ -20,6 +20,10 @@ build: web backend
 ## run: build everything and run against the current kubeconfig
 run: build
 	./$(BINARY)
+
+## demo: build everything and run against the built-in sample cluster
+demo: build
+	./$(BINARY) --demo
 
 ## dev: run backend only; start the frontend separately with `cd web && npm run dev`
 dev:

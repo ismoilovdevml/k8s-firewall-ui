@@ -8,20 +8,42 @@
 
 ## Features
 
-- 🗺️ **Topology viewer** — live graph of workloads with policy-derived edges: green = allowed by policy, red = blocked, dotted = no policy applies. Click an edge to see which policies decide it.
-- ✏️ **Policy management** — list, inspect (human-readable rule rendering), create, edit (form + YAML), and delete NetworkPolicies. Every change can be validated with a server-side dry-run first; concurrent edits are detected via resourceVersion.
-- 🧪 **Connection simulator** — "can pod A reach pod B on port 5432?" answered from the policy set, with the exact rule that allowed or denied each side and links to the policies.
+- 🛡️ **Security overview**: a posture score, ingress/egress isolation coverage per namespace, and prioritized findings. Findings include egress isolation that breaks DNS, selectors with label typos that match nothing, allow-all rules, `0.0.0.0/0` ingress, policies that select no pods, and unprotected namespaces. One click hardens a namespace with a default-deny baseline.
+
+  ![Overview](docs/screenshots/overview.png)
+
+- 🗺️ **Topology viewer**: a live graph of workloads with policy-derived edges. Green means allowed by policy, red means blocked, dotted means no policy applies. Click an edge to see which policies decide it.
+- ✏️ **Policy management**: list, inspect (human-readable rule rendering), create, edit (form + YAML), and delete NetworkPolicies. Every change can be validated with a server-side dry-run first, and concurrent edits are detected via resourceVersion.
+- 🔮 **Impact preview**: before you create, edit or delete a policy, see exactly which workload-to-workload connections become blocked or allowed.
+- 📚 **Templates**: start from proven patterns such as default-deny (DNS kept open), allow DNS, same-namespace, ingress controller, Prometheus scraping, and HTTPS egress.
+
+  ![Templates and impact preview](docs/screenshots/templates-impact.png)
+
+- 🧪 **Connection simulator**: answers "can pod A reach pod B on port 5432?" from the policy set, with the exact rule that allowed or denied each side and links to the policies.
 
   ![Simulator](docs/screenshots/simulator.png)
 
-- 🧱 **Visual builder** — compose a policy on a canvas: peer cards flow into the target (ingress) or out of it (egress); separate cards are OR, an AND lives inside one card — the #1 NetworkPolicy authoring mistake, made visible. Live YAML preview as you build.
+- 🧱 **Visual builder**: compose a policy on a canvas. Peer cards flow into the target (ingress) or out of it (egress). Separate cards are OR, and an AND lives inside one card, which makes the #1 NetworkPolicy authoring mistake visible. The YAML preview updates live as you build.
 
   ![Builder](docs/screenshots/builder.png)
 
-- 🚨 **CNI awareness** — detects your CNI (Calico, Cilium, Antrea, flannel, …) and warns loudly when policies are silently unenforced (plain flannel, VPC CNI without the policy agent). Detects AdminNetworkPolicy CRDs and tells you results may be incomplete.
-- ⚠️ **Built-in guardrails** — warnings for the DNS egress trap (default-deny egress breaks DNS), hostNetwork pods (selectors don't match them), and node-local traffic bypass.
+- 📦 **GitOps-friendly import/export**: export clean, re-appliable multi-document YAML; import YAML from another cluster or a repo with a mandatory dry-run first (created / updated / unchanged per policy).
+- 🔐 **Enterprise access control**: sign in with a Kubernetes token or through your SSO proxy (oauth2-proxy, Pomerium). Writes run as the signed-in user, so Kubernetes RBAC decides who may change which namespace. The UI disables actions you are not allowed to perform.
+- 🧾 **Audit log**: every change is recorded with user, source IP, result, and a before/after YAML diff, as structured logs and on an in-app audit page.
+- 📈 **Operable**: Prometheus metrics (including posture score and findings), JSON logs, health/readiness probes, graceful shutdown, strict security headers + CSP, CSRF protection, and optional TLS.
+- 🚨 **CNI awareness**: detects your CNI (Calico, Cilium, Antrea, flannel, …) and warns loudly when policies are silently unenforced (plain flannel, VPC CNI without the policy agent). Detects AdminNetworkPolicy CRDs and tells you results may be incomplete.
 
 ## Quickstart
+
+### Try it without a cluster
+
+```bash
+docker run --rm -p 8080:8080 ghcr.io/ismoilovdevml/k8s-firewall-ui:latest --demo
+# or from source: make demo
+# open http://localhost:8080
+```
+
+`--demo` serves a built-in sample cluster (three teams, a few deliberate policy mistakes). Changes stay in memory.
 
 ### Local mode (against your kubeconfig)
 
@@ -42,6 +64,15 @@ kubectl port-forward svc/firewall-ui-k8s-firewall-ui 8080:8080
 ```
 
 Set `readOnly: true` to deploy without write permissions (the ClusterRole drops the write verbs and the binary rejects mutations).
+
+For team or organization use, enable per-user sign-in:
+
+```bash
+helm install firewall-ui deploy/helm/k8s-firewall-ui \
+  --set auth.mode=token --set auth.secureCookies=true
+```
+
+See the **[production deployment guide](docs/deployment.md)** for SSO via oauth2-proxy, RBAC, TLS, HA, monitoring and audit.
 
 ### Docker
 
@@ -79,11 +110,11 @@ kind create cluster --name k8s-firewall-ui --config hack/kind-config.yaml
 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml
 ```
 
-Architecture and conventions: [CLAUDE.md](CLAUDE.md) · API reference: [docs/api.md](docs/api.md)
+Architecture and conventions: [CLAUDE.md](CLAUDE.md) · API reference: [docs/api.md](docs/api.md) · Deployment: [docs/deployment.md](docs/deployment.md) · Security: [SECURITY.md](SECURITY.md)
 
 ## Status
 
-v0.1 — all core features implemented (topology, CRUD, simulator, builder, Helm/Docker/CI). Roadmap: token login with per-user RBAC, OIDC, AdminNetworkPolicy evaluation once the API reaches beta, policy generation from observed traffic.
+v0.2: the core features (topology, CRUD, simulator, builder) plus the enterprise features: posture analysis, impact preview, templates, import/export, per-user auth (token / SSO proxy), audit log, metrics, and a hardened Helm chart. Roadmap: AdminNetworkPolicy evaluation once the API reaches beta, policy suggestions from observed traffic (Hubble / flow logs), and multi-cluster.
 
 ## License
 

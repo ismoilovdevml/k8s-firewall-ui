@@ -8,6 +8,7 @@ Open-source Kubernetes NetworkPolicy management dashboard: live topology viewer,
 make build      # full production build (frontend → web/dist, then Go binary with embedded UI)
 make backend    # Go binary only (embeds whatever is in web/dist)
 make run        # build + run against current kubeconfig, serves on :8080
+make demo       # build + run against the built-in sample cluster (no k8s needed)
 make dev        # backend only via go run; run frontend separately:
 cd web && npm run dev   # Vite on :5173, /api proxied to :8080
 make test       # go test ./... -race -cover
@@ -27,15 +28,21 @@ Browser (React SPA) ── REST /api/v1 + SSE /api/v1/events ──▶ Go binary
 | `cmd/k8s-firewall-ui` | flags, wiring, HTTP server |
 | `web/embed.go` | `//go:embed all:dist` — SPA assets (dist/.gitkeep committed so `go build` works without npm) |
 | `internal/kube` | client-go setup, SharedInformerFactory (pods/namespaces/services/networkpolicies), `Snapshot()` |
-| `internal/api` | chi router, REST handlers, SSE hub (debounced invalidate events), dry-run apply |
-| `internal/simulator` | **pure** policy evaluation engine over `ClusterSnapshot` — MUST NOT import client-go or make API calls |
+| `internal/api` | chi router, REST handlers, SSE hub (debounced invalidate events), dry-run apply, import/export, middleware (CSRF, security headers, request log), Prometheus metrics |
+| `internal/auth` | auth modes `none`/`token`/`proxy`, encrypted session cookies, per-user clients (bearer token or impersonation) for ALL writes, SSAR permission checks |
+| `internal/audit` | mutation audit: slog line + in-memory ring for the UI |
+| `internal/demo` | in-memory sample cluster for `--demo` (fake clientset) |
+| `internal/simulator` | **pure** policy evaluation engine over `ClusterSnapshot` — MUST NOT import client-go or make API calls. Also `Analyze` (posture findings/score) and `Impact` (what-if diff) |
 | `internal/cni` | heuristic CNI detection (kube-system DaemonSets + CRD discovery), `--cni-override` escape hatch |
 
-Frontend (`web/src/`): `api/` (fetch client, query keys, sse), `pages/` (Topology, Policies, PolicyDetail, Simulator, Builder), `components/`, `hooks/useSSEInvalidation.ts`. State: TanStack Query + SSE invalidation; zustand only for the builder canvas.
+Frontend (`web/src/`): `api/` (fetch client, query keys, sse), `pages/` (Overview, Topology, Policies, PolicyDetail, PolicyNew, Simulator, Builder, Audit, Login), `components/` (`ui.tsx` primitives, AuthGate, ImpactPanel, ImportDialog), `policy/` (draft model, templates, diff), `hooks/useSSEInvalidation.ts`. State: TanStack Query + SSE invalidation; zustand only for the builder canvas.
 
 ## Conventions
 
 - API routes under `/api/v1`; errors as `{"error": {"code": "...", "message": "..."}}`.
+- Writes MUST use `s.userClient(w, r)` (never `s.clientset`) and call `s.recordAudit` for non-dry-run mutations.
+- Every non-GET API request must carry `X-Requested-With` (the frontend client adds it).
+- `make demo` runs the full app against `internal/demo` — use it to check UI changes without a cluster.
 - Kubernetes types come from `k8s.io/api/networking/v1` etc. — never hand-rolled structs for k8s objects.
 - YAML via `sigs.k8s.io/yaml` (no comment preservation — documented limitation).
 - Kubeconfig resolution order: `--kubeconfig` flag → `KUBECONFIG` env → in-cluster → `~/.kube/config`.

@@ -17,3 +17,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/name: {{ include "k8s-firewall-ui.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
+
+{{- define "k8s-firewall-ui.sessionSecretName" -}}
+{{- default (printf "%s-session" (include "k8s-firewall-ui.fullname" .)) .Values.auth.existingSecret -}}
+{{- end -}}

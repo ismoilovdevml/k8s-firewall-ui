@@ -1,0 +1,24 @@
+k8s-firewall-ui {{ .Chart.AppVersion }} is installed (auth mode: {{ .Values.auth.mode }}{{ if .Values.readOnly }}, read-only{{ end }}).
+
+{{- if .Values.ingress.enabled }}
+Open: {{ range .Values.ingress.hosts }}http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}{{ end }}
+{{- else }}
+Open it locally:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "k8s-firewall-ui.fullname" . }} 8080:{{ .Values.service.port }}
+  then browse to http{{ if .Values.tls.enabled }}s{{ end }}://localhost:8080
+{{- end }}
+{{ if eq .Values.auth.mode "none" }}
+WARNING: auth.mode=none — anyone who can reach the service acts with the
+ServiceAccount's permissions{{ if not .Values.readOnly }} (including editing every NetworkPolicy){{ end }}.
+Keep it behind port-forward, or switch to auth.mode=token or proxy.
+{{- else if eq .Values.auth.mode "token" }}
+Sign in with a Kubernetes token, for example:
+  kubectl -n <namespace> create token <serviceaccount> --duration=8h
+Grant editing rights per team with the bundled role:
+  kubectl -n team-a create rolebinding team-a-netpol \
+    --clusterrole={{ include "k8s-firewall-ui.fullname" . }}-editor --group=team-a
+{{- else }}
+Proxy mode: requests must arrive through your authenticating proxy with the
+{{ .Values.auth.proxy.userHeader }} header set. Restrict direct access with
+networkPolicy.enabled=true and networkPolicy.ingressFrom.
+{{- end }}

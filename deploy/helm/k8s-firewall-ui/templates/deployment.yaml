@@ -13,42 +13,116 @@ spec:
     metadata:
       labels:
         {{- include "k8s-firewall-ui.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- if eq .Values.auth.mode "token" }}
+        # Roll pods when the generated session secret changes.
+        checksum/auth: {{ printf "%s%s" .Values.auth.sessionSecret .Values.auth.existingSecret | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "k8s-firewall-ui.fullname" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: k8s-firewall-ui
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - --listen=:8080
+            - --auth-mode={{ .Values.auth.mode }}
+            - --log-format={{ .Values.logging.format }}
+            - --log-level={{ .Values.logging.level }}
+            - --audit-buffer={{ .Values.audit.bufferSize }}
+            - --metrics={{ .Values.metrics.enabled }}
             {{- if .Values.readOnly }}
             - --read-only
             {{- end }}
             {{- with .Values.cniOverride }}
             - --cni-override={{ . }}
             {{- end }}
+            {{- if eq .Values.auth.mode "token" }}
+            - --session-ttl={{ .Values.auth.sessionTTL }}
+            {{- end }}
+            {{- if eq .Values.auth.mode "proxy" }}
+            - --auth-proxy-user-header={{ .Values.auth.proxy.userHeader }}
+            - --auth-proxy-groups-header={{ .Values.auth.proxy.groupsHeader }}
+            {{- end }}
+            {{- if .Values.auth.secureCookies }}
+            - --secure-cookies
+            {{- end }}
+            {{- if .Values.tls.enabled }}
+            - --tls-cert-file=/etc/k8s-firewall-ui/tls/tls.crt
+            - --tls-key-file=/etc/k8s-firewall-ui/tls/tls.key
+            {{- end }}
+            {{- range .Values.extraArgs }}
+            - {{ . }}
+            {{- end }}
+          env:
+            {{- if eq .Values.auth.mode "token" }}
+            - name: FWUI_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-firewall-ui.sessionSecretName" . }}
+                  key: {{ .Values.auth.existingSecretKey }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: http
+              {{- if .Values.tls.enabled }}
+              scheme: HTTPS
+              {{- end }}
+            periodSeconds: 2
+            failureThreshold: 60
           livenessProbe:
             httpGet:
               path: /healthz
               port: http
+              {{- if .Values.tls.enabled }}
+              scheme: HTTPS
+              {{- end }}
           readinessProbe:
             httpGet:
               path: /readyz
               port: http
+              {{- if .Values.tls.enabled }}
+              scheme: HTTPS
+              {{- end }}
           securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
+            {{- toYaml .Values.securityContext | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.tls.enabled }}
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/k8s-firewall-ui/tls
+              readOnly: true
+          {{- end }}
+      {{- if .Values.tls.enabled }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ required "tls.secretName is required when tls.enabled" .Values.tls.secretName }}
+      {{- end }}
+      terminationGracePeriodSeconds: 30
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -59,5 +133,9 @@ spec:
       {{- end }}
       {{- with .Values.affinity }}
       affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}

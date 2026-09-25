@@ -2,6 +2,7 @@ image:
   repository: ghcr.io/ismoilovdevml/k8s-firewall-ui
   tag: ""            # defaults to the chart appVersion
   pullPolicy: IfNotPresent
+imagePullSecrets: []
 
 # Run without create/update/delete permissions — safe for evaluation.
 readOnly: false
@@ -9,22 +10,111 @@ readOnly: false
 # Skip CNI auto-detection and trust this provider name (e.g. "calico").
 cniOverride: ""
 
+auth:
+  # none  — no login; the ServiceAccount makes every change. Only for
+  #         trusted, private access (port-forward).
+  # token — users sign in with their own Kubernetes bearer token
+  #         (ServiceAccount token or OIDC id_token). Kubernetes RBAC
+  #         decides what each user may change; the ServiceAccount gets no
+  #         write permissions at all.
+  # proxy — an authenticating proxy (oauth2-proxy, Pomerium, …) passes
+  #         the user in headers; writes impersonate that user. The
+  #         ServiceAccount gets impersonation rights instead of writes.
+  #         Make sure ONLY the proxy can reach the pod (see networkPolicy).
+  mode: none
+  sessionTTL: 8h
+  # Session cookie encryption secret (token mode). Leave empty to generate
+  # one that persists across upgrades, or reference your own Secret.
+  sessionSecret: ""
+  existingSecret: ""
+  existingSecretKey: session-secret
+  proxy:
+    userHeader: X-Forwarded-User
+    groupsHeader: X-Forwarded-Groups
+  # Mark cookies Secure. Enable whenever users reach the UI over HTTPS
+  # (e.g. TLS terminated at the ingress).
+  secureCookies: false
+
+# Serve HTTPS directly from the pod using a kubernetes.io/tls Secret.
+tls:
+  enabled: false
+  secretName: ""
+
+logging:
+  format: json      # json | text
+  level: info       # debug | info | warn | error
+
+audit:
+  # Entries kept in memory for the UI's audit page. The durable audit
+  # record is the structured log stream (every entry has audit=true).
+  bufferSize: 1000
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    labels: {}
+
 replicaCount: 1
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Dogfooding: restrict traffic to the UI pod itself.
+networkPolicy:
+  enabled: false
+  # Peers allowed to reach the UI. Empty = any source in the cluster.
+  # For auth.mode=proxy, set this to select only the proxy pods.
+  ingressFrom: []
+  #  - namespaceSelector:
+  #      matchLabels:
+  #        kubernetes.io/metadata.name: ingress-nginx
+  # CIDR(s) of the Kubernetes API server for the egress allow rule.
+  apiServerCIDRs:
+    - 0.0.0.0/0
+  apiServerPorts: [443, 6443]
 
 service:
   type: ClusterIP
   port: 8080
+  annotations: {}
 
 ingress:
   enabled: false
   className: ""
   annotations: {}
+    # Server-Sent Events need buffering off on ingress-nginx:
+    # nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    # nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
   hosts:
     - host: firewall-ui.example.com
       paths:
         - path: /
           pathType: Prefix
   tls: []
+
+extraArgs: []
+extraEnv: []
+
+podAnnotations: {}
+podLabels: {}
+priorityClassName: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
 
 resources:
   requests:
@@ -36,3 +126,4 @@ resources:
 nodeSelector: {}
 tolerations: []
 affinity: {}
+topologySpreadConstraints: []

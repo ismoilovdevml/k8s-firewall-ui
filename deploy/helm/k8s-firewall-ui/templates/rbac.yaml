@@ -1,3 +1,6 @@
+{{- if not (has .Values.auth.mode (list "none" "token" "proxy")) }}
+{{- fail "auth.mode must be one of: none, token, proxy" }}
+{{- end }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -12,11 +15,18 @@ rules:
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
     verbs: ["get", "list", "watch"]
-  {{- if not .Values.readOnly }}
-  # Write path: policy management.
+  {{- if and (eq .Values.auth.mode "none") (not .Values.readOnly) }}
+  # Write path (auth.mode=none only): the ServiceAccount makes changes.
+  # In token/proxy mode, writes run with the end user's own identity.
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
     verbs: ["create", "update", "patch", "delete"]
+  {{- end }}
+  {{- if eq .Values.auth.mode "proxy" }}
+  # Proxy mode: act as the signed-in user so their RBAC applies.
+  - apiGroups: [""]
+    resources: ["users", "groups"]
+    verbs: ["impersonate"]
   {{- end }}
   # CNI detection: kube-system DaemonSets + API group discovery.
   - apiGroups: ["apps"]
@@ -37,3 +47,17 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "k8s-firewall-ui.fullname" . }}
     namespace: {{ .Release.Namespace }}
+---
+# Grant end users policy-editing rights with a binding to this role, e.g.
+#   kubectl create rolebinding team-a-netpol --clusterrole={{ include "k8s-firewall-ui.fullname" . }}-editor \
+#     --group=team-a -n team-a
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "k8s-firewall-ui.fullname" . }}-editor
+  labels:
+    {{- include "k8s-firewall-ui.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
