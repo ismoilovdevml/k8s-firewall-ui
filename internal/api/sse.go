@@ -16,11 +16,17 @@ const heartbeatInterval = 25 * time.Second
 type sseHub struct {
 	mu      sync.Mutex
 	clients map[chan kube.Event]struct{}
+	done    chan struct{}
+	once    sync.Once
+	metrics *Metrics
 }
 
-func newSSEHub() *sseHub {
-	return &sseHub{clients: map[chan kube.Event]struct{}{}}
+func newSSEHub(m *Metrics) *sseHub {
+	return &sseHub{clients: map[chan kube.Event]struct{}{}, done: make(chan struct{}), metrics: m}
 }
+
+// close ends every open stream (graceful shutdown).
+func (h *sseHub) close() { h.once.Do(func() { close(h.done) }) }
 
 // run consumes the store's event stream for the lifetime of the process.
 func (h *sseHub) run(events <-chan kube.Event) {
@@ -41,10 +47,16 @@ func (h *sseHub) subscribe() (chan kube.Event, func()) {
 	h.mu.Lock()
 	h.clients[ch] = struct{}{}
 	h.mu.Unlock()
+	if h.metrics != nil {
+		h.metrics.sse.Inc()
+	}
 	return ch, func() {
 		h.mu.Lock()
 		delete(h.clients, ch)
 		h.mu.Unlock()
+		if h.metrics != nil {
+			h.metrics.sse.Dec()
+		}
 	}
 }
 
@@ -57,6 +69,7 @@ func (h *sseHub) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // disable nginx ingress buffering
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
@@ -69,6 +82,8 @@ func (h *sseHub) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-r.Context().Done():
+			return
+		case <-h.done:
 			return
 		case <-heartbeat.C:
 			_, _ = fmt.Fprint(w, ": heartbeat\n\n")

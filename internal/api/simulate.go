@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/simulator"
@@ -9,7 +10,7 @@ import (
 
 func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
 	var in simulator.Input
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, maxBodySize)).Decode(&in); err != nil {
 		writeError(w, http.StatusBadRequest, "INVALID_INPUT", err.Error())
 		return
 	}

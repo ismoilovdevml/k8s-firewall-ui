@@ -3,9 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"sort"
 
-	"github.com/ismoilovdevml/k8s-firewall-ui/internal/kube"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/simulator"
 )
 
@@ -46,57 +44,29 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request) {
 		wanted[ns] = true
 	}
 
-	// Collapse pods into workloads, keeping one representative pod per
-	// workload: replicas of a workload share labels, so one pod's verdict
-	// holds for all of them.
-	type workload struct {
-		node topologyNode
-		rep  kube.PodInfo
-	}
-	byID := map[string]*workload{}
-	for _, p := range snap.Pods {
-		if !wanted[p.Namespace] {
-			continue
-		}
-		id := p.Namespace + "/" + p.Owner
-		if wl, exists := byID[id]; exists {
-			wl.node.PodCount++
-			wl.node.HostNetwork = wl.node.HostNetwork || p.HostNetwork
-			continue
-		}
-		byID[id] = &workload{
-			node: topologyNode{ID: id, Namespace: p.Namespace, Workload: p.Owner, PodCount: 1, HostNetwork: p.HostNetwork},
-			rep:  p,
-		}
-	}
-	if len(byID) > maxTopologyWorkloads {
+	workloads := simulator.Workloads(snap, wanted)
+	if len(workloads) > maxTopologyWorkloads {
 		writeError(w, http.StatusUnprocessableEntity, "TOO_MANY_WORKLOADS",
-			fmt.Sprintf("%d workloads in selection (max %d) — narrow the namespace filter", len(byID), maxTopologyWorkloads))
+			fmt.Sprintf("%d workloads in selection (max %d) — narrow the namespace filter", len(workloads), maxTopologyWorkloads))
 		return
 	}
 
-	ids := make([]string, 0, len(byID))
-	for id := range byID {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-
-	nodes := make([]topologyNode, 0, len(ids))
-	for _, id := range ids {
-		nodes = append(nodes, byID[id].node)
+	nodes := make([]topologyNode, 0, len(workloads))
+	for _, wl := range workloads {
+		nodes = append(nodes, topologyNode{ID: wl.ID, Namespace: wl.Namespace, Workload: wl.Owner, PodCount: wl.PodCount, HostNetwork: wl.HostNetwork})
 	}
 
 	edges := []topologyEdge{}
-	for _, srcID := range ids {
-		for _, dstID := range ids {
-			if srcID == dstID {
+	for _, src := range workloads {
+		for _, dst := range workloads {
+			if src.ID == dst.ID {
 				continue
 			}
-			verdict, policies := simulator.EvaluateEdge(snap, byID[srcID].rep, byID[dstID].rep)
+			verdict, policies := simulator.EvaluateEdge(snap, src.Rep, dst.Rep)
 			edges = append(edges, topologyEdge{
-				ID:       srcID + "->" + dstID,
-				Source:   srcID,
-				Target:   dstID,
+				ID:       src.ID + "->" + dst.ID,
+				Source:   src.ID,
+				Target:   dst.ID,
 				Verdict:  verdict,
 				Policies: dedupeRefs(policies),
 			})

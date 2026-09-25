@@ -19,6 +19,8 @@ func (s *Server) handleClusterInfo(w http.ResponseWriter, _ *http.Request) {
 		"appVersion":        version.Version,
 		"kubernetesVersion": s.k8sVersion,
 		"cni":               s.cniResult,
+		"readOnly":          s.readOnly,
+		"authMode":          s.auth.Mode(),
 	})
 }
 
