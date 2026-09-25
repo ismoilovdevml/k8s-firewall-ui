@@ -60,8 +60,20 @@ func New(size int, logger *slog.Logger) *Log {
 	return &Log{ring: make([]Entry, size), logger: logger}
 }
 
+// maxYAMLBytes caps Before/After so the in-memory ring stays bounded even
+// if someone applies oversized objects (real NetworkPolicies are ~1 KiB).
+const maxYAMLBytes = 64 << 10
+
+func truncate(s string) string {
+	if len(s) <= maxYAMLBytes {
+		return s
+	}
+	return s[:maxYAMLBytes] + "\n# … truncated by k8s-firewall-ui audit (object larger than 64 KiB)\n"
+}
+
 // Record stores e (assigning ID and Time) and emits a log line.
 func (l *Log) Record(e Entry) Entry {
+	e.Before, e.After = truncate(e.Before), truncate(e.After)
 	l.mu.Lock()
 	l.seq++
 	e.ID = l.seq

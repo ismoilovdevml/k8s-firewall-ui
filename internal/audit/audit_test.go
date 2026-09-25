@@ -3,7 +3,9 @@ package audit
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"log/slog"
+	"strings"
 	"testing"
 )
 
@@ -48,5 +50,17 @@ func TestRingAndFilter(t *testing.T) {
 	var rec map[string]any
 	if err := json.Unmarshal(lines[0], &rec); err != nil || rec["audit"] != true || rec["namespace"] != "a" {
 		t.Fatalf("log line = %s (%v)", lines[0], err)
+	}
+}
+
+func TestRecordTruncatesLargeYAML(t *testing.T) {
+	l := New(2, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	big := strings.Repeat("x", 1<<20)
+	e := l.Record(Entry{Action: "update", Before: big, After: "small"})
+	if len(e.Before) > maxYAMLBytes+200 || !strings.Contains(e.Before, "truncated") {
+		t.Fatalf("Before not truncated: %d bytes", len(e.Before))
+	}
+	if e.After != "small" {
+		t.Fatalf("small YAML must be kept verbatim")
 	}
 }

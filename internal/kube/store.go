@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +35,10 @@ type Store struct {
 
 	synced bool
 	sMu    sync.RWMutex
+
+	// generation increases on every informer event, so derived results
+	// (posture, namespace graph) can be cached until the cluster changes.
+	generation atomic.Uint64
 }
 
 // NewStore builds informers for pods, namespaces, and networkpolicies.
@@ -88,7 +93,12 @@ func (s *Store) markDirtyHandler(resource string) cache.ResourceEventHandlerFunc
 	}
 }
 
+// Generation identifies the current cache contents; it changes whenever
+// any watched object changes.
+func (s *Store) Generation() uint64 { return s.generation.Load() }
+
 func (s *Store) markDirty(resource string) {
+	s.generation.Add(1)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.dirty[resource] = true

@@ -20,6 +20,8 @@ type Store interface {
 	Snapshot() (*kube.ClusterSnapshot, error)
 	Synced() bool
 	Events() <-chan kube.Event
+	// Generation changes whenever the cached cluster state changes.
+	Generation() uint64
 }
 
 // Options configures a Server.
@@ -47,6 +49,7 @@ type Server struct {
 	log        *slog.Logger
 	metrics    *Metrics
 	hub        *sseHub
+	cache      *resultCache
 }
 
 // NewServer constructs the API server; the SSE hub goroutine starts
@@ -79,6 +82,7 @@ func NewServer(o Options) *Server {
 		log:        o.Logger,
 		metrics:    o.Metrics,
 		hub:        newSSEHub(o.Metrics),
+		cache:      o.Metrics.cache,
 	}
 	go s.hub.run(o.Store.Events())
 	return s

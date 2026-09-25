@@ -21,7 +21,7 @@ func (s *Server) handlePosture(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	report := simulator.Analyze(v.full)
+	report := s.cache.get(v.gen, "posture", func() any { return simulator.Analyze(v.full) }).(simulator.PostureReport)
 	if !v.vis.All {
 		report = simulator.FilterPosture(report, v.visible)
 	}

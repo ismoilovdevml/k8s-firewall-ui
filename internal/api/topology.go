@@ -3,6 +3,8 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/simulator"
 )
@@ -131,6 +133,18 @@ func (s *Server) handleNamespaceTopology(w http.ResponseWriter, v *view, namespa
 			fmt.Sprintf("%d workloads in selection (max %d for the namespace graph) — select fewer namespaces", n, maxNamespaceGraphWorkloads))
 		return
 	}
-	nodes, edges := simulator.NamespaceGraph(snap, wanted)
-	writeJSON(w, http.StatusOK, map[string]any{"level": "namespace", "nodes": nodes, "edges": edges})
+	keys := make([]string, 0, len(wanted))
+	for ns := range wanted {
+		keys = append(keys, ns)
+	}
+	sort.Strings(keys)
+	type graph struct {
+		nodes []simulator.NamespaceNode
+		edges []simulator.NamespaceEdge
+	}
+	g := s.cache.get(v.gen, "nsgraph:"+strings.Join(keys, ","), func() any {
+		nodes, edges := simulator.NamespaceGraph(snap, wanted)
+		return graph{nodes, edges}
+	}).(graph)
+	writeJSON(w, http.StatusOK, map[string]any{"level": "namespace", "nodes": g.nodes, "edges": g.edges})
 }

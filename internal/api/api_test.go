@@ -25,11 +25,15 @@ import (
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/kube"
 )
 
-type fakeStore struct{ snap *kube.ClusterSnapshot }
+type fakeStore struct {
+	snap *kube.ClusterSnapshot
+	gen  uint64
+}
 
 func (f *fakeStore) Snapshot() (*kube.ClusterSnapshot, error) { return f.snap, nil }
 func (f *fakeStore) Synced() bool                             { return true }
 func (f *fakeStore) Events() <-chan kube.Event                { return make(chan kube.Event) }
+func (f *fakeStore) Generation() uint64                       { return f.gen }
 
 func denyAll(ns string) *networkingv1.NetworkPolicy {
 	return &networkingv1.NetworkPolicy{
@@ -62,7 +66,7 @@ func newHarness(t *testing.T, readOnly bool, authn *auth.Authenticator, pols ...
 	}
 	log := audit.New(10, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	srv := NewServer(Options{
-		Store: &fakeStore{snap}, Clientset: cs, CNI: cni.Result{Provider: "calico", EnforcesPolicies: true},
+		Store: &fakeStore{snap: snap}, Clientset: cs, CNI: cni.Result{Provider: "calico", EnforcesPolicies: true},
 		ReadOnly: readOnly, Auth: authn, Audit: log, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	t.Cleanup(srv.Close)

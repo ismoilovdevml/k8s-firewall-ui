@@ -13,6 +13,9 @@ import (
 type view struct {
 	full *kube.ClusterSnapshot
 	vis  auth.Visibility
+	// gen is the store generation read BEFORE the snapshot, so a result
+	// cached under it can only be older-than-needed, never stale-and-kept.
+	gen uint64
 }
 
 func (v *view) visible(ns string) bool { return v.vis.Visible(ns) }
@@ -44,6 +47,7 @@ func (v *view) filtered() *kube.ClusterSnapshot {
 
 // view loads the snapshot and the caller's namespace visibility.
 func (s *Server) view(w http.ResponseWriter, r *http.Request) (*view, bool) {
+	gen := s.store.Generation()
 	snap, ok := s.snapshot(w)
 	if !ok {
 		return nil, false
@@ -58,7 +62,7 @@ func (s *Server) view(w http.ResponseWriter, r *http.Request) (*view, bool) {
 			"could not determine which namespaces you may view: "+err.Error())
 		return nil, false
 	}
-	return &view{full: snap, vis: vis}, true
+	return &view{full: snap, vis: vis, gen: gen}, true
 }
 
 // notVisible answers like a missing object so hidden namespaces are not

@@ -18,6 +18,9 @@ type Metrics struct {
 	latency   *prometheus.HistogramVec
 	mutations *prometheus.CounterVec
 	sse       prometheus.Gauge
+	// cache is shared with the API server so scrapes and page loads reuse
+	// the same posture analysis.
+	cache *resultCache
 }
 
 // NewMetrics registers process, Go, HTTP, mutation and cluster collectors.
@@ -26,6 +29,7 @@ func NewMetrics(store Store) *Metrics {
 	reg := prometheus.NewRegistry()
 	m := &Metrics{
 		registry: reg,
+		cache:    newResultCache(32),
 		requests: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "fwui_http_requests_total", Help: "HTTP requests by method, route and status code.",
 		}, []string{"method", "route", "code"}),
@@ -44,7 +48,7 @@ func NewMetrics(store Store) *Metrics {
 		collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
 	if store != nil {
-		reg.MustRegister(&clusterCollector{store: store})
+		reg.MustRegister(&clusterCollector{store: store, cache: m.cache})
 	}
 	return m
 }
@@ -73,7 +77,10 @@ var (
 )
 
 // clusterCollector derives posture gauges from a fresh snapshot per scrape.
-type clusterCollector struct{ store Store }
+type clusterCollector struct {
+	store Store
+	cache *resultCache
+}
 
 func (c *clusterCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, d := range []*prometheus.Desc{descPolicies, descPods, descIsolated, descScore, descFindings, descSynced} {
@@ -90,11 +97,12 @@ func (c *clusterCollector) Collect(ch chan<- prometheus.Metric) {
 	if synced == 0 {
 		return
 	}
+	gen := c.store.Generation() // before the snapshot; see view.gen
 	snap, err := c.store.Snapshot()
 	if err != nil {
 		return
 	}
-	r := simulator.Analyze(snap)
+	r := c.cache.get(gen, "posture", func() any { return simulator.Analyze(snap) }).(simulator.PostureReport)
 	s := r.Summary
 	ch <- prometheus.MustNewConstMetric(descPolicies, prometheus.GaugeValue, float64(s.Policies))
 	ch <- prometheus.MustNewConstMetric(descPods, prometheus.GaugeValue, float64(s.Pods))
