@@ -1,0 +1,286 @@
+# Sample multi-team application for end-to-end tests and screenshots.
+# Mirrors the built-in --demo cluster (internal/demo). Every container is
+# busybox serving HTTP on its declared ports, so connectivity can be probed
+# with wget from any pod. Apply: kubectl apply -f hack/e2e/workloads.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shop
+  labels:
+    team: "storefront"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments
+  labels:
+    team: "payments"
+    pci: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: analytics
+  labels:
+    team: "data"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ingress-nginx
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: main
+          image: busybox:1.36
+          command: ["sh", "-c", "echo ok > /tmp/index.html; httpd -f -p 80 -h /tmp"]
+          ports:
+            - name: http
+              containerPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prometheus
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: main
+          image: busybox:1.36
+          command: ["sh", "-c", "echo ok > /tmp/index.html; httpd -f -p 9090 -h /tmp"]
+          ports:
+            - name: web
+              containerPort: 9090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: shop
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+      tier: web
+  template:
+    metadata:
+      labels:
+        app: frontend
+        tier: web
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: main
+          image: busybox:1.36
+          command: ["sh", "-c", "echo ok > /tmp/index.html; httpd -f -p 8080 -h /tmp & httpd -f -p 9100 -h /tmp; wait"]
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: metrics
+              containerPort: 9100
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart
+  namespace: shop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cart
+      tier: api
+  template:
+    metadata:
+      labels:
+        app: cart
+        tier: api
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: main
+          image: busybox:1.36
+          command: ["sh", "-c", "echo ok > /tmp/index.html; httpd -f -p 8080 -h /tmp"]
+          ports:
+            - name: http
+              containerPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog
+  namespace: shop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog
+      tier: api
+  template:
+    metadata:
+      labels:
+        app: catalog
+        tier: api
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: main
+          image: busybox:1.36
+          command: ["sh", "-c", "echo ok > /tmp/index.html; httpd -f -p 8080 -h /tmp"]
+          ports:
+            - name: http
+              containerPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: shop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+      tier: cache
+  template:
+    metadata:
+      labels:
+        app: redis
+        tier: cache
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: main
+          image: busybox:1.36
+          command: ["sh", "-c", "echo ok > /tmp/index.html; httpd -f -p 6379 -h /tmp"]
+          ports:
+            - name: redis
+              containerPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-api
+  namespace: payments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payments-api
+  template:
+    metadata:
+      labels:
+        app: payments-api
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: main
+          image: busybox:1.36
+          command: ["sh", "-c", "echo ok > /tmp/index.html; httpd -f -p 8443 -h /tmp"]
+          ports:
+            - name: http
+              containerPort: 8443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-db
+  namespace: payments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger-db
+  template:
+    metadata:
+      labels:
+        app: ledger-db
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: main
+          image: busybox:1.36
+          command: ["sh", "-c", "echo ok > /tmp/index.html; httpd -f -p 5432 -h /tmp"]
+          ports:
+            - name: postgres
+              containerPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: collector
+  template:
+    metadata:
+      labels:
+        app: collector
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: main
+          image: busybox:1.36
+          command: ["sh", "-c", "echo ok > /tmp/index.html; httpd -f -p 8080 -h /tmp"]
+          ports:
+            - name: http
+              containerPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+        - name: main
+          image: busybox:1.36
+          command: ["sh", "-c", "echo ok > /tmp/index.html; httpd -f -p 3000 -h /tmp"]
+          ports:
+            - name: http
+              containerPort: 3000

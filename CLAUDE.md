@@ -13,6 +13,7 @@ make dev        # backend only via go run; run frontend separately:
 cd web && npm run dev   # Vite on :5173, /api proxied to :8080
 make test       # go test ./... -race -cover
 make test-web   # cd web && npm test -- --run  (vitest)
+make e2e        # real cluster: simulator-vs-enforcement check + Playwright UI tests (docs/testing.md)
 make lint       # golangci-lint run
 make lint-web   # cd web && npm run lint
 ```
@@ -42,6 +43,7 @@ Frontend (`web/src/`): `api/` (fetch client, query keys, sse), `pages/` (Overvie
 - API routes under `/api/v1`; errors as `{"error": {"code": "...", "message": "..."}}`.
 - Writes MUST use `s.userClient(w, r)` (never `s.clientset`) and call `s.recordAudit` for non-dry-run mutations.
 - Every non-GET API request must carry `X-Requested-With` (the frontend client adds it).
+- User-visible changes need a Playwright test in `web/e2e/*.e2e.ts`; semantics changes must keep `test/e2e` at 0 mismatches.
 - `make demo` runs the full app against `internal/demo` — use it to check UI changes without a cluster.
 - Kubernetes types come from `k8s.io/api/networking/v1` etc. — never hand-rolled structs for k8s objects.
 - YAML via `sigs.k8s.io/yaml` (no comment preservation — documented limitation).

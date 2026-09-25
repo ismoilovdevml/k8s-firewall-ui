@@ -1,0 +1,94 @@
+# Policy set for end-to-end tests. Mirrors internal/demo, including its
+# deliberate mistakes (a peer label typo, egress isolation without DNS, an
+# ingress rule open to 0.0.0.0/0) so the posture findings are exercised.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny-all, namespace: shop}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-ingress-to-frontend, namespace: shop}
+spec:
+  podSelector: {matchLabels: {app: frontend}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingress-nginx}}}]
+      ports: [{protocol: TCP, port: http}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: frontend-to-apis, namespace: shop}
+spec:
+  podSelector: {matchLabels: {tier: api}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: frontend}}}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: frontend-egress, namespace: shop}
+spec:
+  podSelector: {matchLabels: {app: frontend}}
+  policyTypes: [Egress]
+  egress:
+    - to: [{podSelector: {matchLabels: {tier: api}}}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: cart-to-redis, namespace: shop}
+spec:
+  podSelector: {matchLabels: {app: redis}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: cart}}}]
+      ports: [{protocol: TCP, port: 6379}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-prometheus-scrape, namespace: shop}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: prometheus}}
+      ports: [{protocol: TCP, port: metrics}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: ledger-db-ingress, namespace: payments}
+spec:
+  podSelector: {matchLabels: {app: ledger-db}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: payment-api}}}]   # typo on purpose
+      ports: [{protocol: TCP, port: 5432}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: payments-api-egress, namespace: payments}
+spec:
+  podSelector: {matchLabels: {app: payments-api}}
+  policyTypes: [Egress]
+  egress:
+    - to: [{podSelector: {matchLabels: {app: ledger-db}}}]
+      ports: [{protocol: TCP, port: 5432}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: legacy-open-webhook, namespace: payments}
+spec:
+  podSelector: {matchLabels: {app: payments-api}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{ipBlock: {cidr: 0.0.0.0/0}}]

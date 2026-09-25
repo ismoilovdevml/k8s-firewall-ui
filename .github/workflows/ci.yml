@@ -91,3 +91,40 @@ jobs:
           curl -sf localhost:8080/metrics | grep -q fwui_posture_score
           # writes without the CSRF header are rejected
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8080/api/v1/simulate -d '{}')" = 403
+
+  e2e:
+    # Real cluster: k3s enforces NetworkPolicy with its embedded kube-router.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Start k3s
+        run: |
+          curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.33.4+k3s1 \
+            INSTALL_K3S_EXEC="--disable=traefik --disable=metrics-server --write-kubeconfig-mode=644" sh -
+          echo "KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> "$GITHUB_ENV"
+          for i in $(seq 1 60); do kubectl get nodes 2>/dev/null | grep -q " Ready" && break; sleep 2; done
+          kubectl -n kube-system wait --for=condition=Ready pod -l k8s-app=kube-dns --timeout=180s
+      - name: Install Playwright
+        working-directory: web
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Run end-to-end suite
+        run: hack/e2e/run.sh
+      - name: Upload videos, screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            web/e2e-results
+            web/e2e-report
+            e2e-server.log
+          retention-days: 14

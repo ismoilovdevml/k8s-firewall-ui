@@ -2,7 +2,7 @@ BINARY := bin/k8s-firewall-ui
 VERSION ?= dev
 LDFLAGS := -s -w -X github.com/ismoilovdevml/k8s-firewall-ui/internal/version.Version=$(VERSION)
 
-.PHONY: all web backend build run demo dev test test-web lint lint-web docker helm-lint clean
+.PHONY: all web backend build run demo dev test test-web e2e lint lint-web docker helm-lint clean
 
 all: build
 
@@ -34,6 +34,10 @@ test:
 
 test-web:
 	cd web && npm test -- --run
+
+## e2e: enforcement cross-check + Playwright UI suite against the current KUBECONFIG
+e2e:
+	hack/e2e/run.sh
 
 lint:
 	golangci-lint run ./...

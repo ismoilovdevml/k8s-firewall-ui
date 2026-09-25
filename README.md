@@ -4,7 +4,9 @@
 
 > No open-source tool combines a live-cluster view, a visual policy builder, apply/CRUD, and connection simulation — that combination only exists in commercial products. k8s-firewall-ui fills the gap: CNI-agnostic, self-hosted, Apache-2.0.
 
-![Topology view](docs/screenshots/topology.png)
+![Walkthrough](docs/media/walkthrough.gif)
+
+*A 55-second tour recorded by the Playwright suite against a real k3s cluster ([MP4](docs/media/walkthrough.mp4)).*
 
 ## Features
 
@@ -12,7 +14,10 @@
 
   ![Overview](docs/screenshots/overview.png)
 
-- 🗺️ **Topology viewer**: a live graph of workloads with policy-derived edges. Green means allowed by policy, red means blocked, dotted means no policy applies. Click an edge to see which policies decide it.
+- 🗺️ **Topology viewer**: a live graph of workloads with policy-derived edges. Green means allowed by policy, red means blocked, dotted means no policy applies. Filter by verdict, and click an edge to see which policies decide it.
+
+  ![Topology](docs/screenshots/topology.png)
+
 - ✏️ **Policy management**: list, inspect (human-readable rule rendering), create, edit (form + YAML), and delete NetworkPolicies. Every change can be validated with a server-side dry-run first, and concurrent edits are detected via resourceVersion.
 - 🔮 **Impact preview**: before you create, edit or delete a policy, see exactly which workload-to-workload connections become blocked or allowed.
 - 📚 **Templates**: start from proven patterns such as default-deny (DNS kept open), allow DNS, same-namespace, ingress controller, Prometheus scraping, and HTTPS egress.
@@ -91,6 +96,10 @@ docker build -t k8s-firewall-ui .
 
 Release binaries for Linux and macOS are attached to [GitHub Releases](https://github.com/ismoilovdevml/k8s-firewall-ui/releases).
 
+## Verified against real enforcement
+
+The end-to-end suite deploys a sample multi-team app to a real cluster, asks the simulator about **every workload pair and port**, then actually opens each connection and fails on any disagreement (`99 connections probed, 0 mismatches` on k3s). The same run drives the UI with Playwright in token-auth mode. See [docs/testing.md](docs/testing.md).
+
 ## How the simulator works
 
 The engine is a pure function over an informer-cache snapshot, implementing the NetworkPolicy spec exactly: a connection is allowed iff the source's egress check AND the destination's ingress check both pass; a pod is default-allow until a policy selects it for that direction, then default-deny plus the union of matching rules. Peer AND/OR structure, `ipBlock` with `except`, named ports, `endPort` ranges, and empty-vs-missing rule lists are all covered by a table-driven test matrix, and verdicts are spot-checked against real Calico enforcement in CI-adjacent testing. See [docs/research/network-policy-semantics.md](docs/research/network-policy-semantics.md) for the semantics reference.
@@ -110,7 +119,7 @@ kind create cluster --name k8s-firewall-ui --config hack/kind-config.yaml
 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml
 ```
 
-Architecture and conventions: [CLAUDE.md](CLAUDE.md) · API reference: [docs/api.md](docs/api.md) · Deployment: [docs/deployment.md](docs/deployment.md) · Security: [SECURITY.md](SECURITY.md)
+Architecture and conventions: [CLAUDE.md](CLAUDE.md) · Testing: [docs/testing.md](docs/testing.md) · API reference: [docs/api.md](docs/api.md) · Deployment: [docs/deployment.md](docs/deployment.md) · Security: [SECURITY.md](SECURITY.md)
 
 ## Status
 

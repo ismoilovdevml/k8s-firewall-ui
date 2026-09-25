@@ -1,0 +1,42 @@
+# Two test identities for the UI tests: an editor who may change
+# NetworkPolicies everywhere, and a viewer who may only read them.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fwui-e2e
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: editor, namespace: fwui-e2e}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: viewer, namespace: fwui-e2e}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: fwui-e2e-editor}
+rules:
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: fwui-e2e-viewer}
+rules:
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: fwui-e2e-editor}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: fwui-e2e-editor}
+subjects: [{kind: ServiceAccount, name: editor, namespace: fwui-e2e}]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: fwui-e2e-viewer}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: fwui-e2e-viewer}
+subjects: [{kind: ServiceAccount, name: viewer, namespace: fwui-e2e}]

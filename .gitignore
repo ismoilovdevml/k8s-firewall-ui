@@ -24,3 +24,9 @@ coverage.out
 # Playwright MCP artifacts
 .playwright-mcp/
 .superpowers/
+
+# E2E artifacts
+web/e2e-results/
+web/e2e-report/
+web/e2e-auth/
+e2e-server.log
