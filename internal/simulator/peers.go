@@ -16,6 +16,17 @@ func selectorMatches(sel *metav1.LabelSelector, lbls map[string]string) bool {
 	if sel == nil {
 		return false
 	}
+	// Fast path for the common matchLabels-only selector (no allocation);
+	// semantics are identical to LabelSelectorAsSelector: every key must be
+	// present with the same value, and an empty selector matches all.
+	if len(sel.MatchExpressions) == 0 {
+		for k, v := range sel.MatchLabels {
+			if got, ok := lbls[k]; !ok || got != v {
+				return false
+			}
+		}
+		return true
+	}
 	s, err := metav1.LabelSelectorAsSelector(sel)
 	if err != nil {
 		return false // invalid selector selects nothing

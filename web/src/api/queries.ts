@@ -7,6 +7,7 @@ import type {
   ImpactResult,
   ImportResponse,
   NamespaceInfo,
+  NamespaceTopology,
   Permissions,
   PodInfo,
   PodIsolation,
@@ -236,4 +237,15 @@ export function exportUrl(namespace?: string) {
   return namespace
     ? `/api/v1/networkpolicies/export?namespace=${encodeURIComponent(namespace)}`
     : '/api/v1/networkpolicies/export'
+}
+
+/** Namespace-level graph over every non-system namespace. */
+export function useNamespaceTopology(enabled: boolean) {
+  return useQuery({
+    // Same first segment as the workload graph so SSE invalidation covers both.
+    queryKey: ['topology', 'namespace-level'],
+    queryFn: () => apiGet<NamespaceTopology>('/api/v1/topology?level=namespace'),
+    enabled,
+    retry: false,
+  })
 }

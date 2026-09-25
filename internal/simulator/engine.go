@@ -70,7 +70,12 @@ func PodsSelectedBy(snap *Snapshot, pol *networkingv1.NetworkPolicy) []kube.PodI
 // evalSide runs one direction's check: does `subject`'s policy set (for dir)
 // admit traffic with `other`? Non-isolated subjects allow everything.
 func evalSide(snap *Snapshot, subject kube.PodInfo, dir direction, other target, query *PortQuery) SideResult {
-	pols := policiesSelecting(snap, subject, dir)
+	return evalSideWith(snap, subject, policiesSelecting(snap, subject, dir), dir, other, query)
+}
+
+// evalSideWith is evalSide with the subject's selecting policies supplied
+// (precomputed by an Index for bulk evaluation).
+func evalSideWith(snap *Snapshot, subject kube.PodInfo, pols []*networkingv1.NetworkPolicy, dir direction, other target, query *PortQuery) SideResult {
 	res := SideResult{
 		Applicable: true,
 		Isolated:   len(pols) > 0,
@@ -169,7 +174,10 @@ func lower(dir direction) string {
 func EvaluateEdge(snap *Snapshot, src, dst kube.PodInfo) (EdgeVerdict, []PolicyRef) {
 	egress := evalSide(snap, src, dirEgress, podTarget(dst), nil)
 	ingress := evalSide(snap, dst, dirIngress, podTarget(src), nil)
+	return edgeVerdict(egress, ingress)
+}
 
+func edgeVerdict(egress, ingress SideResult) (EdgeVerdict, []PolicyRef) {
 	refs := append(egress.EvaluatedPolicies, ingress.EvaluatedPolicies...)
 	switch {
 	case !egress.Isolated && !ingress.Isolated:

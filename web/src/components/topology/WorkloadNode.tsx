@@ -10,7 +10,7 @@ export default function WorkloadNode({ data }: NodeProps) {
 
   return (
     <div className="w-[220px] rounded-md border border-edge bg-surface px-3 py-2 shadow-sm">
-      <Handle type="target" position={Position.Left} className="!bg-quiet" />
+      <Handle type="target" position={Position.Left} className="!opacity-0" />
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate font-mono text-sm font-semibold text-text">{name}</span>
         <span className="shrink-0 font-mono text-[10px] uppercase text-quiet">{kind}</span>
@@ -30,7 +30,7 @@ export default function WorkloadNode({ data }: NodeProps) {
           </span>
         )}
       </div>
-      <Handle type="source" position={Position.Right} className="!bg-quiet" />
+      <Handle type="source" position={Position.Right} className="!opacity-0" />
     </div>
   )
 }

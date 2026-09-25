@@ -299,3 +299,29 @@ func TestProxyAuthRequired(t *testing.T) {
 		t.Fatalf("authenticated status %d", w.Code)
 	}
 }
+
+func TestNamespaceTopology(t *testing.T) {
+	h := newHarness(t, false, nil, denyAll("b"))
+	w := h.do(http.MethodGet, "/api/v1/topology?level=namespace", "")
+	var res struct {
+		Level string `json:"level"`
+		Nodes []struct {
+			Namespace string `json:"namespace"`
+		} `json:"nodes"`
+		Edges []struct {
+			Source, Target string
+			Counts         struct{ Allowed, Blocked, Unconstrained int }
+		} `json:"edges"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil || w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body)
+	}
+	if res.Level != "namespace" || len(res.Nodes) != 2 || len(res.Edges) != 2 {
+		t.Fatalf("graph = %+v", res)
+	}
+	for _, e := range res.Edges {
+		if e.Source == "a" && e.Counts.Blocked != 1 {
+			t.Errorf("a -> b should be blocked by b's default deny: %+v", e)
+		}
+	}
+}

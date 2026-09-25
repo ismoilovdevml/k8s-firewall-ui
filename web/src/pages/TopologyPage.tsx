@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ReactFlow, Background, Controls, MarkerType } from '@xyflow/react'
 import type { Edge, Node } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -7,9 +7,12 @@ import { useNamespaces, useTopology } from '../api/queries'
 import { ApiError } from '../api/client'
 import type { EdgeVerdict, TopologyEdge } from '../api/types'
 import WorkloadNode from '../components/topology/WorkloadNode'
-import { layoutGraph } from '../components/topology/layout'
+import NamespaceGraph from '../components/topology/NamespaceGraph'
+import { layoutCircle } from '../components/topology/layout'
+import FloatingEdge from '../components/topology/FloatingEdge'
 
 const nodeTypes = { workload: WorkloadNode }
+const edgeTypes = { floating: FloatingEdge }
 
 const VERDICT_STYLE: Record<EdgeVerdict, { stroke: string; dash?: string; label: string }> = {
   allowed: { stroke: 'var(--color-allow)', label: 'allowed by policy' },
@@ -17,9 +20,51 @@ const VERDICT_STYLE: Record<EdgeVerdict, { stroke: string; dash?: string; label:
   unconstrained: { stroke: 'var(--color-quiet)', dash: '2 4', label: 'no policy applies' },
 }
 
+type View = 'namespaces' | 'workloads'
+
 export default function TopologyPage() {
-  const { data: namespaces } = useNamespaces()
+  const [view, setView] = useState<View>('namespaces')
   const [selected, setSelected] = useState<string[]>([])
+  const openNamespace = useCallback((ns: string) => {
+    setSelected([ns])
+    setView('workloads')
+  }, [])
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-1 border-b border-edge px-4 pt-2">
+        {(['namespaces', 'workloads'] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            aria-pressed={view === v}
+            className={`px-3 py-2 font-mono text-xs ${
+              view === v ? 'border-b-2 border-accent text-accent-strong' : 'text-muted hover:text-text'
+            }`}
+          >
+            {v === 'namespaces' ? 'Namespaces' : 'Workloads'}
+          </button>
+        ))}
+      </div>
+      <div className="min-h-0 flex-1">
+        {view === 'namespaces' ? (
+          <NamespaceGraph onOpen={openNamespace} />
+        ) : (
+          <WorkloadTopology selected={selected} setSelected={setSelected} />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function WorkloadTopology({
+  selected,
+  setSelected,
+}: {
+  selected: string[]
+  setSelected: React.Dispatch<React.SetStateAction<string[]>>
+}) {
+  const { data: namespaces } = useNamespaces()
   const [activeEdge, setActiveEdge] = useState<TopologyEdge | null>(null)
   const [visible, setVisible] = useState<Record<EdgeVerdict, boolean>>({
     allowed: true,
@@ -41,6 +86,7 @@ export default function TopologyPage() {
       const style = VERDICT_STYLE[e.verdict]
       return {
         id: e.id,
+        type: 'floating',
         source: e.source,
         target: e.target,
         style: { stroke: style.stroke, strokeDasharray: style.dash },
@@ -48,8 +94,9 @@ export default function TopologyPage() {
         data: { edge: e },
       }
     })
-    // Layout uses every edge so hiding a verdict does not move nodes.
-    return { nodes: layoutGraph(rfNodes, rfEdges), edges: rfEdges }
+    // Nodes arrive sorted by namespace/workload, so a circle keeps each
+    // namespace's workloads adjacent; hiding a verdict never moves nodes.
+    return { nodes: layoutCircle(rfNodes), edges: rfEdges }
   }, [topology.data])
   const shownEdges = useMemo(
     () => edges.filter((e) => visible[(e.data as { edge: TopologyEdge }).edge.verdict]),
@@ -140,6 +187,7 @@ export default function TopologyPage() {
             nodes={nodes}
             edges={shownEdges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onEdgeClick={(_, edge) => setActiveEdge((edge.data as { edge: TopologyEdge }).edge)}
             onPaneClick={() => setActiveEdge(null)}
             fitView

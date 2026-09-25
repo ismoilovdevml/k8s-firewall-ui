@@ -39,10 +39,25 @@ type ClusterSnapshot struct {
 	Pods       []PodInfo
 	Namespaces []NamespaceInfo
 	Policies   []*networkingv1.NetworkPolicy
+
+	// nsLabels indexes Namespaces by name; built by IndexNamespaces.
+	nsLabels map[string]map[string]string
+}
+
+// IndexNamespaces builds the namespace-label lookup table. Call it once
+// after the snapshot is complete; without it lookups scan linearly.
+func (s *ClusterSnapshot) IndexNamespaces() {
+	s.nsLabels = make(map[string]map[string]string, len(s.Namespaces))
+	for _, ns := range s.Namespaces {
+		s.nsLabels[ns.Name] = ns.Labels
+	}
 }
 
 // NamespaceLabels returns the labels of the named namespace, or nil.
 func (s *ClusterSnapshot) NamespaceLabels(name string) map[string]string {
+	if s.nsLabels != nil {
+		return s.nsLabels[name]
+	}
 	for _, ns := range s.Namespaces {
 		if ns.Name == name {
 			return ns.Labels

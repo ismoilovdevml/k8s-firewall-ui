@@ -61,9 +61,10 @@ test('walkthrough', async ({ page }) => {
 
   // 4. Topology
   await page.getByRole('link', { name: /Topology/ }).click()
-  for (const ns of ['shop', 'payments']) {
-    await page.getByRole('button', { name: new RegExp(`^${ns}\\s*\\d+$`) }).click()
-  }
+  await expect(page.locator('.react-flow__node').first()).toBeVisible()
+  await caption(page, 'Namespace view: how every team can reach every other — scales to large clusters', 3500)
+  await page.locator('.react-flow__node', { hasText: 'shop' }).click()
+  await page.getByRole('button', { name: /^payments\s*\d+$/ }).click()
   await page.waitForTimeout(800)
   await caption(page, 'Live topology: green = allowed by policy, red = blocked, dotted = no policy', 3500)
   await page.getByRole('button', { name: /^blocked/ }).click()

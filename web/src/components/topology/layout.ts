@@ -1,28 +1,22 @@
-import dagre from '@dagrejs/dagre'
-import type { Edge, Node } from '@xyflow/react'
+import type { Node } from '@xyflow/react'
 
 const NODE_WIDTH = 220
 const NODE_HEIGHT = 72
 
-/** Auto-layouts nodes left-to-right with dagre. */
-export function layoutGraph(nodes: Node[], edges: Edge[]): Node[] {
-  const g = new dagre.graphlib.Graph()
-  g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: 'LR', nodesep: 40, ranksep: 120 })
-
-  for (const node of nodes) {
-    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
-  }
-  for (const edge of edges) {
-    g.setEdge(edge.source, edge.target)
-  }
-  dagre.layout(g)
-
-  return nodes.map((node) => {
-    const pos = g.node(node.id)
+/**
+ * Places nodes on a circle (dense, fully connected graphs such as the
+ * namespace view, where a layered layout degenerates into a line).
+ */
+export function layoutCircle(nodes: Node[]): Node[] {
+  const n = nodes.length
+  if (n <= 1) return nodes.map((node) => ({ ...node, position: { x: 0, y: 0 } }))
+  // Radius so that neighbours on the circle do not overlap.
+  const r = Math.max(220, (n * (NODE_WIDTH + 60)) / (2 * Math.PI))
+  return nodes.map((node, i) => {
+    const angle = (2 * Math.PI * i) / n - Math.PI / 2
     return {
       ...node,
-      position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 },
+      position: { x: r * Math.cos(angle) - NODE_WIDTH / 2, y: r * Math.sin(angle) - NODE_HEIGHT / 2 },
     }
   })
 }

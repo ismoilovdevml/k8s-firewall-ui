@@ -105,7 +105,9 @@ Response: `{selectedWorkloads, newlyBlocked: [{source, target, before, after}], 
 
 ## Topology
 
-`GET /api/v1/topology?namespaces=a,b` → `{nodes, edges}` where nodes are workloads (pods collapsed by owner) and each directed edge carries a verdict: `allowed` | `blocked` | `unconstrained`, plus the policies involved. Requests spanning more than 40 workloads return 422 `TOO_MANY_WORKLOADS`.
+`GET /api/v1/topology?namespaces=a,b` → `{nodes, edges}` where nodes are workloads (pods collapsed by owner) and each directed edge carries a verdict: `allowed` | `blocked` | `unconstrained`, plus the policies involved. Requests spanning more than 60 workloads return 422 `TOO_MANY_WORKLOADS`.
+
+`GET /api/v1/topology?level=namespace[&namespaces=a,b]` → `{level: "namespace", nodes: [{namespace, workloads, pods, internal}], edges: [{source, target, counts}]}`. Each edge tallies every workload pair between two namespaces as `{allowed, blocked, unconstrained}`; `internal` does the same inside a namespace. Without `namespaces` it covers all non-system namespaces (up to 1500 workloads).
 
 ## Events
 

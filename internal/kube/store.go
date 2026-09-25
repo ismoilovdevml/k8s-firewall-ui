@@ -146,5 +146,6 @@ func (s *Store) Snapshot() (*ClusterSnapshot, error) {
 		a, b := snap.Policies[i], snap.Policies[j]
 		return a.Namespace+"/"+a.Name < b.Namespace+"/"+b.Name
 	})
+	snap.IndexNamespaces()
 	return snap, nil
 }

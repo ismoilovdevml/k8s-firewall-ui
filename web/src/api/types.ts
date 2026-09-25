@@ -181,3 +181,28 @@ export interface ImportResponse {
   summary: Partial<Record<ImportResult['action'], number>>
   results: ImportResult[]
 }
+
+export interface VerdictCounts {
+  allowed: number
+  blocked: number
+  unconstrained: number
+}
+
+export interface NamespaceGraphNode {
+  namespace: string
+  workloads: number
+  pods: number
+  internal: VerdictCounts
+}
+
+export interface NamespaceGraphEdge {
+  source: string
+  target: string
+  counts: VerdictCounts
+}
+
+export interface NamespaceTopology {
+  level: 'namespace'
+  nodes: NamespaceGraphNode[]
+  edges: NamespaceGraphEdge[]
+}

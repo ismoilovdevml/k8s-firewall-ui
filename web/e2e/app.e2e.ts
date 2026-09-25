@@ -51,7 +51,13 @@ test('policy detail surfaces the label typo', async ({ page }) => {
 test('topology maps workloads and filters edges by verdict', async ({ page }) => {
   await signIn(page)
   await page.goto('/topology')
-  await page.getByRole('button', { name: /^shop\s*\d+$/ }).click()
+  // Namespace level first: one node per application namespace.
+  await expect(page.locator('.react-flow__node')).toHaveCount(5)
+  await expect(page.getByRole('button', { name: /^partial/ })).toBeVisible()
+  await page.screenshot({ path: 'e2e-results/shots/topology-namespaces.png' })
+  // Drill into shop.
+  await page.locator('.react-flow__node', { hasText: 'shop' }).click()
+  await expect(page.getByRole('button', { name: 'Workloads' })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('.react-flow__node')).toHaveCount(4) // frontend, cart, catalog, redis
   const blocked = page.getByRole('button', { name: /^blocked/ })
   const before = await page.locator('.react-flow__edge').count()

@@ -46,6 +46,7 @@ func NormalizePolicy(pol *networkingv1.NetworkPolicy) *networkingv1.NetworkPolic
 // is replaced by proposed, or removed when proposed is nil.
 func WithPolicy(snap *Snapshot, namespace, name string, proposed *networkingv1.NetworkPolicy) *Snapshot {
 	out := &Snapshot{Pods: snap.Pods, Namespaces: snap.Namespaces}
+	out.IndexNamespaces()
 	for _, pol := range snap.Policies {
 		if pol.Namespace == namespace && pol.Name == name {
 			continue
@@ -88,14 +89,15 @@ func Impact(snap *Snapshot, namespace, name string, proposed *networkingv1.Netwo
 		}
 	}
 
+	beforeIdx, afterIdx := NewIndex(snap), NewIndex(after)
 	eval := func(src, dst Workload) {
 		if res.EvaluatedPairs >= maxImpactPairs {
 			res.Truncated = true
 			return
 		}
 		res.EvaluatedPairs++
-		before, _ := EvaluateEdge(snap, src.Rep, dst.Rep)
-		now, _ := EvaluateEdge(after, src.Rep, dst.Rep)
+		before, _ := beforeIdx.EvaluateEdge(src.Rep, dst.Rep)
+		now, _ := afterIdx.EvaluateEdge(src.Rep, dst.Rep)
 		edge := ImpactEdge{Source: src.ID, Target: dst.ID, Before: before, After: now}
 		switch {
 		case before != EdgeBlocked && now == EdgeBlocked:

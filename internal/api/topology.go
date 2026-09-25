@@ -7,8 +7,13 @@ import (
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/simulator"
 )
 
-// maxTopologyWorkloads bounds the O(n²) edge computation per request.
-const maxTopologyWorkloads = 40
+// maxTopologyWorkloads bounds the workload graph: beyond this the browser
+// cannot render the O(n²) edges usefully; use the namespace level instead.
+const maxTopologyWorkloads = 60
+
+// maxNamespaceGraphWorkloads bounds the O(n²) evaluation behind the
+// namespace-level graph (~0.2 s per 400 workloads with the index).
+const maxNamespaceGraphWorkloads = 1500
 
 type topologyNode struct {
 	ID        string `json:"id"` // "<namespace>/<owner>"
@@ -30,6 +35,10 @@ type topologyEdge struct {
 
 func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request) {
 	namespaces := splitCSV(r.URL.Query().Get("namespaces"))
+	if r.URL.Query().Get("level") == "namespace" {
+		s.handleNamespaceTopology(w, namespaces)
+		return
+	}
 	if len(namespaces) == 0 {
 		writeError(w, http.StatusBadRequest, "NAMESPACES_REQUIRED", "pass ?namespaces=a,b — topology is computed per namespace selection")
 		return
@@ -56,13 +65,14 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request) {
 		nodes = append(nodes, topologyNode{ID: wl.ID, Namespace: wl.Namespace, Workload: wl.Owner, PodCount: wl.PodCount, HostNetwork: wl.HostNetwork})
 	}
 
+	idx := simulator.NewIndex(snap)
 	edges := []topologyEdge{}
 	for _, src := range workloads {
 		for _, dst := range workloads {
 			if src.ID == dst.ID {
 				continue
 			}
-			verdict, policies := simulator.EvaluateEdge(snap, src.Rep, dst.Rep)
+			verdict, policies := idx.EvaluateEdge(src.Rep, dst.Rep)
 			edges = append(edges, topologyEdge{
 				ID:       src.ID + "->" + dst.ID,
 				Source:   src.ID,
@@ -86,4 +96,31 @@ func dedupeRefs(refs []simulator.PolicyRef) []simulator.PolicyRef {
 		}
 	}
 	return out
+}
+
+// handleNamespaceTopology serves the namespace-level graph. Without a
+// namespace filter it covers every non-system namespace with pods.
+func (s *Server) handleNamespaceTopology(w http.ResponseWriter, namespaces []string) {
+	snap, ok := s.snapshot(w)
+	if !ok {
+		return
+	}
+	wanted := map[string]bool{}
+	for _, ns := range namespaces {
+		wanted[ns] = true
+	}
+	if len(wanted) == 0 {
+		for _, ns := range snap.Namespaces {
+			if !simulator.IsSystemNamespace(ns.Name) {
+				wanted[ns.Name] = true
+			}
+		}
+	}
+	if n := len(simulator.Workloads(snap, wanted)); n > maxNamespaceGraphWorkloads {
+		writeError(w, http.StatusUnprocessableEntity, "TOO_MANY_WORKLOADS",
+			fmt.Sprintf("%d workloads in selection (max %d for the namespace graph) — select fewer namespaces", n, maxNamespaceGraphWorkloads))
+		return
+	}
+	nodes, edges := simulator.NamespaceGraph(snap, wanted)
+	writeJSON(w, http.StatusOK, map[string]any{"level": "namespace", "nodes": nodes, "edges": edges})
 }
