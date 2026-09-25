@@ -705,7 +705,8 @@ func (b *builder) lockdown(self endpoint, dir direction, blocked endpoint, keepE
 	for _, ns := range namespaces {
 		wls := openByNS[ns]
 		// Whole namespace open (and not partially blocked): one namespace term.
-		if len(wls) == totalByNS[ns] && !(blockedNS && blocked.peer.Namespace == ns) {
+		partiallyBlocked := blockedNS && blocked.peer.Namespace == ns
+		if len(wls) == totalByNS[ns] && !partiallyBlocked {
 			upsertRule(pol, dir, networkingv1.NetworkPolicyPeer{NamespaceSelector: nsSelector(ns)}, nil)
 			kept += len(wls)
 			continue
@@ -729,7 +730,8 @@ func (b *builder) lockdown(self endpoint, dir direction, blocked endpoint, keepE
 		if blocked.isExternal() && blocked.peer.CIDR != "0.0.0.0/0" && !coveredBy(blocked.peer.CIDR, PrivateRanges) {
 			block.Except = append(block.Except, blocked.peer.CIDR)
 		}
-		if !(blocked.isExternal() && blocked.peer.CIDR == "0.0.0.0/0") {
+		blocksInternet := blocked.isExternal() && blocked.peer.CIDR == "0.0.0.0/0"
+		if !blocksInternet {
 			upsertRule(pol, dir, networkingv1.NetworkPolicyPeer{IPBlock: block}, nil)
 		}
 	} else {
@@ -784,8 +786,7 @@ func (b *builder) narrow(self endpoint, dir direction, blocked endpoint, plan *P
 	for _, id := range ids {
 		orig := b.existing(id.ns, id.name)
 		if orig == nil || !isManaged(orig) {
-			m := admitting[id]
-			plan.Blockers = append(plan.Blockers, Blocker{Policy: m.Policy, RuleIndex: m.RuleIndex, Explanation: m.Explanation})
+			plan.Blockers = append(plan.Blockers, Blocker(admitting[id]))
 			continue
 		}
 		pol := b.working(id.ns, id.name)
