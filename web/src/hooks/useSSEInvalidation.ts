@@ -20,6 +20,8 @@ export function useSSEInvalidation() {
         void queryClient.invalidateQueries({ queryKey: [resource] })
         if (TOPOLOGY_SOURCES.has(resource)) {
           void queryClient.invalidateQueries({ queryKey: ['topology'] })
+          void queryClient.invalidateQueries({ queryKey: ['posture'] })
+          void queryClient.invalidateQueries({ queryKey: ['isolation'] })
         }
       } catch {
         // malformed event; ignore

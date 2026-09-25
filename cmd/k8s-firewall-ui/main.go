@@ -17,11 +17,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/api"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/audit"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/auth"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/cni"
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/demo"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/kube"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/version"
 	"github.com/ismoilovdevml/k8s-firewall-ui/web"
@@ -45,6 +48,7 @@ type config struct {
 	logFormat         string
 	logLevel          string
 	shutdownTimeout   time.Duration
+	demo              bool
 }
 
 func main() {
@@ -68,6 +72,7 @@ func main() {
 	flags.StringVar(&c.logFormat, "log-format", "text", "log format: text | json")
 	flags.StringVar(&c.logLevel, "log-level", "info", "log level: debug | info | warn | error")
 	flags.DurationVar(&c.shutdownTimeout, "shutdown-timeout", 15*time.Second, "graceful shutdown timeout")
+	flags.BoolVar(&c.demo, "demo", false, "run against a built-in in-memory sample cluster (no Kubernetes needed)")
 	showVersion := flags.Bool("version", false, "print version and exit")
 	_ = flags.Parse(os.Args[1:])
 	if err := applyEnv(flags); err != nil {
@@ -144,16 +149,27 @@ func run(ctx context.Context, c config, logger *slog.Logger) error {
 		logger.Warn("no session secret configured: sessions are lost on restart and do not work across replicas")
 	}
 
-	clientset, restConfig, err := kube.NewClientset(c.kubeconfig)
-	if err != nil {
-		return err
-	}
-
+	var (
+		clientset  kubernetes.Interface
+		restConfig *rest.Config
+	)
 	serverVersion := "unknown"
-	if v, err := clientset.Discovery().ServerVersion(); err == nil {
-		serverVersion = v.GitVersion
+	if c.demo {
+		if mode != auth.ModeNone {
+			return errors.New("--demo supports only --auth-mode=none")
+		}
+		logger.Warn("DEMO MODE: serving a built-in sample cluster; changes are kept in memory only")
+		clientset, serverVersion = demo.Clientset(), "v1.34.0 (demo)"
 	} else {
-		logger.Warn("could not read server version", "error", err)
+		clientset, restConfig, err = kube.NewClientset(c.kubeconfig)
+		if err != nil {
+			return err
+		}
+		if v, err := clientset.Discovery().ServerVersion(); err == nil {
+			serverVersion = v.GitVersion
+		} else {
+			logger.Warn("could not read server version", "error", err)
+		}
 	}
 
 	store, err := kube.NewStore(clientset)

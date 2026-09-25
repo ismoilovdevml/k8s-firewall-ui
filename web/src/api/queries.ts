@@ -1,6 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiSend, apiSendYaml } from './client'
-import type { ClusterInfo, NamespaceInfo, PodInfo, PolicySummary, Topology } from './types'
+import type {
+  AuditEntry,
+  AuthMe,
+  ClusterInfo,
+  ImpactResult,
+  ImportResponse,
+  NamespaceInfo,
+  Permissions,
+  PodInfo,
+  PodIsolation,
+  PolicySummary,
+  PostureReport,
+  Topology,
+} from './types'
 import type { K8sNetworkPolicy } from '../policy/model'
 
 export interface PolicyDetail {
@@ -115,4 +128,112 @@ export function useTopology(namespaces: string[]) {
     enabled: namespaces.length > 0,
     retry: false,
   })
+}
+
+// ---- auth ----
+
+export function useMe() {
+  return useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => apiGet<AuthMe>('/api/v1/auth/me'),
+    staleTime: 60_000,
+    retry: false,
+  })
+}
+
+export function useLogin() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (token: string) => apiSend<AuthMe>('POST', '/api/v1/auth/login', { token }),
+    onSuccess: (me) => {
+      qc.setQueryData(['auth', 'me'], me)
+      void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'auth' })
+    },
+  })
+}
+
+export function useLogout() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiSend<{ status: string }>('POST', '/api/v1/auth/logout'),
+    onSuccess: () => {
+      qc.clear()
+      void qc.invalidateQueries({ queryKey: ['auth'] })
+    },
+  })
+}
+
+/** Whether the current user may change NetworkPolicies in namespace (RBAC). */
+export function usePermissions(namespace: string) {
+  return useQuery({
+    queryKey: ['auth', 'permissions', namespace],
+    queryFn: () => apiGet<Permissions>(`/api/v1/auth/permissions?namespace=${encodeURIComponent(namespace)}`),
+    enabled: namespace !== '',
+    staleTime: 60_000,
+  })
+}
+
+// ---- insights ----
+
+export function usePosture() {
+  return useQuery({
+    // Derived from pods + policies + namespaces; invalidated on all three.
+    queryKey: ['posture'],
+    queryFn: () => apiGet<PostureReport>('/api/v1/posture'),
+  })
+}
+
+export function useNamespaceIsolation(namespace: string) {
+  return useQuery({
+    queryKey: ['isolation', namespace],
+    queryFn: () => apiGet<PodIsolation[]>(`/api/v1/namespaces/${namespace}/isolation`),
+    enabled: namespace !== '',
+  })
+}
+
+export type ImpactRequest =
+  | { operation: 'apply'; namespace: string; policy?: K8sNetworkPolicy; yaml?: string }
+  | { operation: 'delete'; namespace: string; name: string }
+
+export function useImpact() {
+  return useMutation({
+    mutationFn: (req: ImpactRequest) => apiSend<ImpactResult>('POST', '/api/v1/impact', req),
+  })
+}
+
+export interface AuditFilter {
+  namespace?: string
+  action?: string
+  q?: string
+}
+
+export function useAudit(filter: AuditFilter) {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(filter)) if (v) params.set(k, v)
+  return useQuery({
+    // Refreshed whenever a policy changes.
+    queryKey: ['networkpolicies', 'audit', params.toString()],
+    queryFn: () => apiGet<AuditEntry[]>(`/api/v1/audit?${params}`),
+  })
+}
+
+export function useImportPolicies() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ yaml, namespace, dryRun }: { yaml: string; namespace?: string; dryRun: boolean }) => {
+      const params = new URLSearchParams()
+      if (namespace) params.set('namespace', namespace)
+      if (dryRun) params.set('dryRun', 'true')
+      return apiSendYaml<ImportResponse>('POST', `/api/v1/networkpolicies/import?${params}`, yaml)
+    },
+    onSuccess: (_, { dryRun }) => {
+      if (!dryRun) void qc.invalidateQueries({ queryKey: ['networkpolicies'] })
+    },
+  })
+}
+
+export function exportUrl(namespace?: string) {
+  return namespace
+    ? `/api/v1/networkpolicies/export?namespace=${encodeURIComponent(namespace)}`
+    : '/api/v1/networkpolicies/export'
 }

@@ -156,10 +156,17 @@ func TestAnalyzeCoverageAndScore(t *testing.T) {
 	}{
 		// Application pods: web-1 (a), db-1 (b). kube-system is excluded.
 		{name: "nothing isolated", wantScore: 0},
+		{
+			name: "allow-all rule is not a default-deny", pols: []*networkingv1.NetworkPolicy{policy("a", "open", networkingv1.NetworkPolicySpec{
+				PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+				Ingress:     []networkingv1.NetworkPolicyIngressRule{{}},
+			})},
+			wantIngress: 1, wantScore: 30 - 3 - 3, // ALLOW_ALL_INGRESS + b unprotected
+		},
 		{name: "one of two ingress-isolated", pols: []*networkingv1.NetworkPolicy{denyAllB}, wantIngress: 1, wantScore: 27},
 		{
 			name: "fully isolated both ways in a", pols: []*networkingv1.NetworkPolicy{denyAllA, denyAllB},
-			wantIngress: 2, wantEgress: 1, wantScore: 80, wantDenyInA: true,
+			wantIngress: 2, wantEgress: 1, wantScore: 80, wantDenyInA: true, wantDenyEgA: true,
 		},
 	}
 	for _, tc := range cases {

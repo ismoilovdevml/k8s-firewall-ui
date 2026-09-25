@@ -1,18 +1,26 @@
-import { NavLink, Outlet } from 'react-router-dom'
-import { useClusterInfo } from '../api/queries'
+import { Suspense } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useClusterInfo, useLogout, useMe } from '../api/queries'
 import { useSSEInvalidation } from '../hooks/useSSEInvalidation'
+import ErrorBoundary from './ErrorBoundary'
+import { Spinner } from './ui'
 
 const NAV = [
-  { to: '/', label: 'Topology', hint: 'live traffic map' },
+  { to: '/', label: 'Overview', hint: 'security posture' },
+  { to: '/topology', label: 'Topology', hint: 'live traffic map' },
   { to: '/policies', label: 'Policies', hint: 'rules on the cluster' },
   { to: '/simulator', label: 'Simulator', hint: 'test a connection' },
   { to: '/builder', label: 'Builder', hint: 'draw a policy' },
+  { to: '/audit', label: 'Audit log', hint: 'who changed what' },
 ]
 
 export default function Layout() {
   useSSEInvalidation()
   const { data: info } = useClusterInfo()
   const cni = info?.cni
+  const { data: me } = useMe()
+  const logout = useLogout()
+  const location = useLocation()
 
   return (
     <div className="flex h-screen flex-col">
@@ -58,7 +66,30 @@ export default function Layout() {
             ))}
           </nav>
 
-          <div className="mt-auto p-3">
+          <div className="mt-auto space-y-2 p-3">
+            {me?.user && me.mode !== 'none' && (
+              <div className="rounded-lg bg-sidebar-raised p-3 text-xs text-sidebar-text">
+                <div className="font-mono text-[10px] uppercase tracking-wide text-sidebar-text/60">
+                  signed in as
+                </div>
+                <div className="mt-0.5 truncate font-semibold" title={me.user.name}>
+                  {me.user.name}
+                </div>
+                {me.user.groups.length > 0 && (
+                  <div className="truncate text-sidebar-text/60" title={me.user.groups.join(', ')}>
+                    {me.user.groups.join(', ')}
+                  </div>
+                )}
+                {me.mode === 'token' && (
+                  <button
+                    onClick={() => logout.mutate()}
+                    className="mt-2 text-sidebar-brand hover:underline"
+                  >
+                    Sign out
+                  </button>
+                )}
+              </div>
+            )}
             <div className="rounded-lg bg-sidebar-raised p-3 font-mono text-xs text-sidebar-text">
               <div>cluster {info?.kubernetesVersion ?? '…'}</div>
               <div className="mt-1">
@@ -73,6 +104,7 @@ export default function Layout() {
               {cni?.anpPresent && (
                 <div className="mt-1 text-warn-bg">ANP present (not evaluated)</div>
               )}
+              {info?.readOnly && <div className="mt-1 text-warn-bg">read-only mode</div>}
               {info?.appVersion && (
                 <div className="mt-1 text-sidebar-text/60">{info.appVersion}</div>
               )}
@@ -81,7 +113,11 @@ export default function Layout() {
         </aside>
 
         <main className="min-w-0 flex-1 overflow-auto">
-          <Outlet />
+          <ErrorBoundary key={location.pathname}>
+            <Suspense fallback={<Spinner />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
     </div>

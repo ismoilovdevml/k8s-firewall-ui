@@ -91,11 +91,14 @@ func Analyze(snap *Snapshot) PostureReport {
 	for _, pol := range snap.Policies {
 		np := get(pol.Namespace)
 		np.Policies++
+		// A default-deny baseline isolates every pod in the namespace
+		// (empty podSelector) without an allow-all rule; narrow allows such
+		// as DNS alongside it still count.
 		empty := len(pol.Spec.PodSelector.MatchLabels) == 0 && len(pol.Spec.PodSelector.MatchExpressions) == 0
-		if empty && hasPolicyType(pol, dirIngress) && len(pol.Spec.Ingress) == 0 {
+		if empty && hasPolicyType(pol, dirIngress) && !hasAllowAll(rulesOf(pol, dirIngress)) {
 			np.DefaultDenyIngress = true
 		}
-		if empty && hasPolicyType(pol, dirEgress) && len(pol.Spec.Egress) == 0 {
+		if empty && hasPolicyType(pol, dirEgress) && !hasAllowAll(rulesOf(pol, dirEgress)) {
 			np.DefaultDenyEgress = true
 		}
 		report.Findings = append(report.Findings, policyFindings(snap, pol)...)
@@ -183,6 +186,15 @@ func Analyze(snap *Snapshot) PostureReport {
 	}
 	s.Score = score(*s)
 	return report
+}
+
+func hasAllowAll(rules []normalizedRule) bool {
+	for _, r := range rules {
+		if len(r.peers) == 0 && len(r.ports) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func score(s PostureSummary) int {

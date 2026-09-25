@@ -1,31 +1,63 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useClusterInfo, useNamespaces, usePolicies } from '../api/queries'
+import { exportUrl, useClusterInfo, useNamespaces, usePolicies, usePosture } from '../api/queries'
 import { policyStatus } from '../policy/status'
+import ImportDialog from '../components/ImportDialog'
 
 export default function PoliciesPage() {
   const [namespace, setNamespace] = useState('')
   const [search, setSearch] = useState('')
+  const [importing, setImporting] = useState(false)
   const { data: namespaces } = useNamespaces()
   const { data: policies, isLoading } = usePolicies(namespace || undefined)
   const { data: info } = useClusterInfo()
   const cniEnforces = info?.cni?.enforcesPolicies
+  const { data: posture } = usePosture()
+  const issues = new Map<string, number>()
+  for (const f of posture?.findings ?? []) {
+    if (f.policy && f.severity !== 'info') {
+      const key = `${f.policy.namespace}/${f.policy.name}`
+      issues.set(key, (issues.get(key) ?? 0) + 1)
+    }
+  }
 
   const filtered = (policies ?? []).filter(
-    (p) => !search || p.name.includes(search) || p.namespace.includes(search),
+    (p) => !search || `${p.namespace}/${p.name}`.toLowerCase().includes(search.toLowerCase()),
   )
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-lg font-bold text-text">Network Policies</h1>
-        <Link
-          to="/policies/new"
-          className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:brightness-110"
-        >
-          New policy
-        </Link>
+        <div className="flex gap-2">
+          <a
+            href={exportUrl(namespace || undefined)}
+            download
+            className="rounded border border-edge bg-surface px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong"
+          >
+            Export YAML
+          </a>
+          {!info?.readOnly && (
+            <>
+              <button
+                onClick={() => setImporting(true)}
+                className="rounded border border-edge bg-surface px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong"
+              >
+                Import
+              </button>
+              <Link
+                to="/policies/new"
+                className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:brightness-110"
+              >
+                New policy
+              </Link>
+            </>
+          )}
+        </div>
       </div>
+      {importing && (
+        <ImportDialog namespaces={(namespaces ?? []).map((n) => n.name)} onClose={() => setImporting(false)} />
+      )}
 
       <div className="mt-4 flex gap-2">
         <select
@@ -57,6 +89,7 @@ export default function PoliciesPage() {
               <th className="px-4 py-2.5 font-medium">directions</th>
               <th className="px-4 py-2.5 font-medium">pods matched</th>
               <th className="px-4 py-2.5 font-medium">status</th>
+              <th className="px-4 py-2.5 font-medium">issues</th>
               <th className="px-4 py-2.5 font-medium">created</th>
             </tr>
           </thead>
@@ -91,13 +124,25 @@ export default function PoliciesPage() {
                   >
                     {status.label}
                   </td>
+                  <td className="px-4 py-2.5 text-xs">
+                    {issues.get(`${p.namespace}/${p.name}`) ? (
+                      <Link
+                        to={`/policies/${p.namespace}/${p.name}`}
+                        className="font-semibold text-warn-text hover:underline"
+                      >
+                        ⚠ {issues.get(`${p.namespace}/${p.name}`)}
+                      </Link>
+                    ) : (
+                      <span className="text-quiet">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-2.5 font-mono text-xs text-quiet">{p.createdAt.slice(0, 10)}</td>
                 </tr>
               )
             })}
             {!isLoading && filtered.length === 0 && (
               <tr className="border-t border-edge/60">
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted">
                   {policies?.length
                     ? 'No policies match the filter.'
                     : 'No NetworkPolicies yet — every pod accepts all traffic. Create one to start restricting.'}

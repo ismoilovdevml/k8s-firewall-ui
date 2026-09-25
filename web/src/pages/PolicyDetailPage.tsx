@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useDeletePolicy, usePolicyDetail, useUpdatePolicy } from '../api/queries'
-import { ApiError } from '../api/client'
+import { useDeletePolicy, usePermissions, usePolicyDetail, useUpdatePolicy } from '../api/queries'
+import { ApiError, errorMessage } from '../api/client'
 import { draftToPolicy, policyToDraft } from '../policy/model'
 import type { PolicyDraft } from '../policy/model'
 import { isolationText, ruleText } from '../policy/describe'
 import YamlEditor from '../components/YamlEditor'
 import PolicyForm from '../components/policy-form/PolicyForm'
+import ImpactPanel from '../components/ImpactPanel'
+import { PolicyFindingsCard } from '../components/PolicyFindings'
 
 type Tab = 'overview' | 'edit' | 'yaml' | 'pods'
 
@@ -16,6 +18,7 @@ export default function PolicyDetailPage() {
   const { data, isLoading, error } = usePolicyDetail(namespace, name)
   const update = useUpdatePolicy()
   const remove = useDeletePolicy()
+  const { data: perms } = usePermissions(namespace)
 
   const [tab, setTab] = useState<Tab>('overview')
   const [yamlText, setYamlText] = useState('')
@@ -32,6 +35,7 @@ export default function PolicyDetailPage() {
   }, [data])
 
   const conversion = useMemo(() => (data ? policyToDraft(data.policy) : null), [data])
+  const draftPolicy = useMemo(() => (draft ? draftToPolicy(draft) : null), [draft])
 
   if (isLoading) return <PageNote>Loading…</PageNote>
   if (error instanceof ApiError) return <PageNote tone="error">{error.message}</PageNote>
@@ -50,7 +54,7 @@ export default function PolicyDetailPage() {
           ? err.status === 409
             ? 'The policy changed on the cluster while you were editing. Reload and re-apply your changes.'
             : err.message
-          : String(err),
+          : errorMessage(err),
     })
 
   const validateOrApply = (dryRun: boolean) => {
@@ -104,12 +108,23 @@ export default function PolicyDetailPage() {
             {name}
           </h1>
         </div>
-        <button
-          onClick={() => setConfirmDelete(true)}
-          className="rounded border border-block/50 px-3 py-1.5 text-sm text-block hover:bg-block/10"
-        >
-          Delete
-        </button>
+        <div className="flex gap-2">
+          <a
+            href={`data:application/yaml;charset=utf-8,${encodeURIComponent(data.yaml)}`}
+            download={`${namespace}-${name}.yaml`}
+            className="rounded border border-edge bg-surface px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong"
+          >
+            Download YAML
+          </a>
+          <button
+            onClick={() => setConfirmDelete(true)}
+            disabled={perms?.delete === false}
+            title={perms?.delete === false ? 'You are not allowed to delete policies in this namespace' : undefined}
+            className="rounded border border-block/50 px-3 py-1.5 text-sm text-block hover:bg-block/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Delete
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 flex gap-1 border-b border-edge">
@@ -139,6 +154,7 @@ export default function PolicyDetailPage() {
       <div className="mt-4">
         {tab === 'overview' && (
           <div className="space-y-4">
+            <PolicyFindingsCard namespace={namespace} name={name} />
             <section className="rounded-md border border-edge bg-surface p-4">
               <h2 className="font-mono text-[11px] uppercase tracking-wide text-quiet">effect</h2>
               <ul className="mt-2 space-y-1 text-sm text-text">
@@ -182,9 +198,13 @@ export default function PolicyDetailPage() {
                 <PolicyForm value={draft} onChange={setDraft} identityLocked />
                 <ApplyBar
                   busy={update.isPending}
+                  denied={perms?.update === false}
                   onValidate={() => validateOrApply(true)}
                   onApply={() => validateOrApply(false)}
                 />
+                <div className="mt-4">
+                  <ImpactPanel request={draftPolicy ? { operation: 'apply', namespace, policy: draftPolicy } : null} />
+                </div>
               </div>
             )
           ))}
@@ -194,9 +214,13 @@ export default function PolicyDetailPage() {
             <YamlEditor value={yamlText} onChange={setYamlText} />
             <ApplyBar
               busy={update.isPending}
+              denied={perms?.update === false}
               onValidate={() => validateOrApply(true)}
               onApply={() => validateOrApply(false)}
             />
+            <div className="mt-4">
+              <ImpactPanel request={{ operation: 'apply', namespace, yaml: yamlText }} />
+            </div>
           </div>
         )}
 
@@ -234,8 +258,8 @@ export default function PolicyDetailPage() {
       </div>
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/60">
-          <div className="w-96 rounded-md border border-edge bg-surface p-5 shadow-xl">
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/60 p-4">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-md border border-edge bg-surface p-5 shadow-xl">
             <h2 className="font-mono text-sm font-semibold text-text">
               Delete {namespace}/{name}?
             </h2>
@@ -244,6 +268,9 @@ export default function PolicyDetailPage() {
                 ? `${data.affectedPods.length} pod(s) currently matched by this policy will lose its restrictions/allowances.`
                 : 'No pods are currently matched by this policy.'}
             </p>
+            <div className="mt-3">
+              <ImpactPanel auto request={{ operation: 'delete', namespace, name }} />
+            </div>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setConfirmDelete(false)}
@@ -268,10 +295,12 @@ export default function PolicyDetailPage() {
 
 function ApplyBar({
   busy,
+  denied,
   onValidate,
   onApply,
 }: {
   busy: boolean
+  denied?: boolean
   onValidate: () => void
   onApply: () => void
 }) {
@@ -286,7 +315,8 @@ function ApplyBar({
       </button>
       <button
         onClick={onApply}
-        disabled={busy}
+        disabled={busy || denied}
+        title={denied ? 'You are not allowed to update policies in this namespace' : undefined}
         className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:brightness-110 disabled:opacity-50"
       >
         Apply
