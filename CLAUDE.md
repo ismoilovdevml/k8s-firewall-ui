@@ -13,6 +13,7 @@ make dev        # backend only via go run; run frontend separately:
 cd web && npm run dev   # Vite on :5173, /api proxied to :8080
 make test       # go test ./... -race -cover
 make test-web   # cd web && npm test -- --run  (vitest)
+make check      # vet + golangci-lint + go tests + web lint/types/tests: run before every push
 make e2e        # real cluster: simulator-vs-enforcement check + Playwright UI tests (docs/testing.md)
 make lint       # golangci-lint run
 make lint-web   # cd web && npm run lint
