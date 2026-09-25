@@ -44,11 +44,11 @@ var daemonSetSignatures = []struct {
 
 // crdGroupSignatures maps API group presence to extra evidence.
 var crdGroupSignatures = map[string]string{
-	"crd.projectcalico.org":     "calico",
-	"cilium.io":                 "cilium",
-	"crd.antrea.io":             "antrea",
-	"policy.networking.k8s.io":  "anp",
-	"kubeovn.io":                "kube-ovn",
+	"crd.projectcalico.org":    "calico",
+	"cilium.io":                "cilium",
+	"crd.antrea.io":            "antrea",
+	"policy.networking.k8s.io": "anp",
+	"kubeovn.io":               "kube-ovn",
 }
 
 // Detect inspects kube-system DaemonSets and API groups. override, when
