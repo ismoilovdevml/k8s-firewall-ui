@@ -85,6 +85,7 @@ export interface AuthUser {
 export interface AuthMe {
   mode: AuthMode
   user: AuthUser | null
+  restrictReads?: boolean
 }
 
 export interface Permissions {

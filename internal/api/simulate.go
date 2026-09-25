@@ -14,11 +14,17 @@ func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "INVALID_INPUT", err.Error())
 		return
 	}
-	snap, ok := s.snapshot(w)
+	v, ok := s.view(w, r)
 	if !ok {
 		return
 	}
-	res, err := simulator.Evaluate(snap, in)
+	for _, ep := range []simulator.Endpoint{in.Source, in.Destination} {
+		if ep.Kind == "pod" && !v.visible(ep.Namespace) {
+			notVisible(w, "pod "+ep.Namespace+"/"+ep.Name)
+			return
+		}
+	}
+	res, err := simulator.Evaluate(v.full, in)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "SIMULATION_FAILED", err.Error())
 		return

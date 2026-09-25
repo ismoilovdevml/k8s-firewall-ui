@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test'
 
 export const editorToken = process.env.FWUI_TOKEN ?? ''
 export const viewerToken = process.env.FWUI_VIEWER_TOKEN ?? ''
+export const tenantToken = process.env.FWUI_TENANT_TOKEN ?? ''
 
 /** Signs in with a token when the server runs in token mode; no-op otherwise. */
 export async function signIn(page: Page, token = editorToken) {

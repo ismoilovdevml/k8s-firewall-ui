@@ -35,22 +35,29 @@ type topologyEdge struct {
 
 func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request) {
 	namespaces := splitCSV(r.URL.Query().Get("namespaces"))
+	v, ok := s.view(w, r)
+	if !ok {
+		return
+	}
 	if r.URL.Query().Get("level") == "namespace" {
-		s.handleNamespaceTopology(w, namespaces)
+		s.handleNamespaceTopology(w, v, namespaces)
 		return
 	}
 	if len(namespaces) == 0 {
 		writeError(w, http.StatusBadRequest, "NAMESPACES_REQUIRED", "pass ?namespaces=a,b — topology is computed per namespace selection")
 		return
 	}
-	snap, ok := s.snapshot(w)
-	if !ok {
-		return
-	}
+	snap := v.full
 
 	wanted := map[string]bool{}
 	for _, ns := range namespaces {
-		wanted[ns] = true
+		if v.visible(ns) {
+			wanted[ns] = true
+		}
+	}
+	if len(wanted) == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{"nodes": []topologyNode{}, "edges": []topologyEdge{}})
+		return
 	}
 
 	workloads := simulator.Workloads(snap, wanted)
@@ -100,21 +107,24 @@ func dedupeRefs(refs []simulator.PolicyRef) []simulator.PolicyRef {
 
 // handleNamespaceTopology serves the namespace-level graph. Without a
 // namespace filter it covers every non-system namespace with pods.
-func (s *Server) handleNamespaceTopology(w http.ResponseWriter, namespaces []string) {
-	snap, ok := s.snapshot(w)
-	if !ok {
-		return
-	}
+func (s *Server) handleNamespaceTopology(w http.ResponseWriter, v *view, namespaces []string) {
+	snap := v.full
 	wanted := map[string]bool{}
 	for _, ns := range namespaces {
-		wanted[ns] = true
+		if v.visible(ns) {
+			wanted[ns] = true
+		}
 	}
-	if len(wanted) == 0 {
+	if len(namespaces) == 0 {
 		for _, ns := range snap.Namespaces {
-			if !simulator.IsSystemNamespace(ns.Name) {
+			if !simulator.IsSystemNamespace(ns.Name) && v.visible(ns.Name) {
 				wanted[ns.Name] = true
 			}
 		}
+	}
+	if len(wanted) == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{"level": "namespace", "nodes": []simulator.NamespaceNode{}, "edges": []simulator.NamespaceEdge{}})
+		return
 	}
 	if n := len(simulator.Workloads(snap, wanted)); n > maxNamespaceGraphWorkloads {
 		writeError(w, http.StatusUnprocessableEntity, "TOO_MANY_WORKLOADS",

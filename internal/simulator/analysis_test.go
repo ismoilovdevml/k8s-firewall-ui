@@ -207,3 +207,31 @@ func TestAnalyzeHostNetworkExcluded(t *testing.T) {
 		t.Fatal("namespace with only hostNetwork pods must not be flagged unprotected")
 	}
 }
+
+func TestFilterPosture(t *testing.T) {
+	full := Analyze(snap(policy("b", "deny", networkingv1.NetworkPolicySpec{
+		PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+	})))
+	full.Findings = append(full.Findings, Finding{Code: "CLUSTER_WIDE", Severity: SeverityInfo, Message: "x"})
+
+	onlyB := FilterPosture(full, func(ns string) bool { return ns == "b" })
+	if len(onlyB.Namespaces) != 1 || onlyB.Namespaces[0].Namespace != "b" {
+		t.Fatalf("namespaces = %+v", onlyB.Namespaces)
+	}
+	for _, f := range onlyB.Findings {
+		if f.Namespace != "" && f.Namespace != "b" {
+			t.Errorf("leaked finding from %s: %+v", f.Namespace, f)
+		}
+	}
+	if s := onlyB.Summary; s.Pods != 1 || s.IngressIsolatedPods != 1 || s.Policies != 1 || s.Score != 60 {
+		t.Errorf("summary = %+v, want 1 pod fully ingress-isolated, score 60", s)
+	}
+
+	all := FilterPosture(full, func(string) bool { return true })
+	if all.Summary.Pods != full.Summary.Pods || len(all.Findings) != len(full.Findings) || len(all.Namespaces) != len(full.Namespaces) {
+		t.Errorf("identity filter changed the report: %+v vs %+v", all.Summary, full.Summary)
+	}
+	if all.Summary.Info != full.Summary.Info+1 {
+		t.Errorf("summary not recomputed from findings: info %d, want %d", all.Summary.Info, full.Summary.Info+1)
+	}
+}

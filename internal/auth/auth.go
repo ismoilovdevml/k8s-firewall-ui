@@ -73,6 +73,10 @@ type Config struct {
 	// Proxy mode header names.
 	UserHeader   string
 	GroupsHeader string
+	// RestrictReads limits what each user can see (namespaces, pods,
+	// policies, findings, topology, audit) to namespaces where their RBAC
+	// allows listing NetworkPolicies. Ignored in mode none.
+	RestrictReads bool
 	// NewClient builds a clientset from a REST config; overridable in tests.
 	NewClient func(*rest.Config) (kubernetes.Interface, error)
 }
@@ -84,6 +88,8 @@ type Authenticator struct {
 
 	limMu    sync.Mutex
 	limiters map[string]*limiterEntry
+
+	vis visibilityCache
 }
 
 type limiterEntry struct {
@@ -112,11 +118,15 @@ func New(cfg Config) (*Authenticator, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Authenticator{cfg: cfg, sessions: codec, limiters: map[string]*limiterEntry{}}, nil
+	return &Authenticator{cfg: cfg, sessions: codec, limiters: map[string]*limiterEntry{},
+		vis: visibilityCache{entries: map[string]visibilityEntry{}}}, nil
 }
 
 // Mode reports the configured mode.
 func (a *Authenticator) Mode() Mode { return a.cfg.Mode }
+
+// RestrictsReads reports whether per-user read filtering is active.
+func (a *Authenticator) RestrictsReads() bool { return a.cfg.RestrictReads && a.cfg.Mode != ModeNone }
 
 type ctxKey struct{}
 
@@ -266,7 +276,7 @@ func (a *Authenticator) HandleMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Authenticator) meResponse(u *User) map[string]any {
-	return map[string]any{"mode": a.cfg.Mode, "user": u}
+	return map[string]any{"mode": a.cfg.Mode, "user": u, "restrictReads": a.RestrictsReads()}
 }
 
 // reviewToken asks the API server who the token belongs to. It uses

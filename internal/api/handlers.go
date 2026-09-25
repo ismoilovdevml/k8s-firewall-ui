@@ -24,11 +24,12 @@ func (s *Server) handleClusterInfo(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func (s *Server) handleNamespaces(w http.ResponseWriter, _ *http.Request) {
-	snap, ok := s.snapshot(w)
+func (s *Server) handleNamespaces(w http.ResponseWriter, r *http.Request) {
+	v, ok := s.view(w, r)
 	if !ok {
 		return
 	}
+	snap := v.filtered()
 	podCount := map[string]int{}
 	for _, p := range snap.Pods {
 		podCount[p.Namespace]++
@@ -50,11 +51,16 @@ func (s *Server) handleNamespaces(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleNamespacePods(w http.ResponseWriter, r *http.Request) {
-	snap, ok := s.snapshot(w)
+	v, ok := s.view(w, r)
 	if !ok {
 		return
 	}
+	snap := v.full
 	ns := chi.URLParam(r, "ns")
+	if !v.visible(ns) {
+		notVisible(w, "namespace "+ns)
+		return
+	}
 	out := []kube.PodInfo{}
 	for _, p := range snap.Pods {
 		if p.Namespace == ns {
@@ -65,10 +71,11 @@ func (s *Server) handleNamespacePods(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePods(w http.ResponseWriter, r *http.Request) {
-	snap, ok := s.snapshot(w)
+	v, ok := s.view(w, r)
 	if !ok {
 		return
 	}
+	snap := v.filtered()
 	ns := r.URL.Query().Get("namespace")
 	var sel labels.Selector
 	if raw := r.URL.Query().Get("labelSelector"); raw != "" {
@@ -102,10 +109,11 @@ type policySummary struct {
 }
 
 func (s *Server) handlePolicyList(w http.ResponseWriter, r *http.Request) {
-	snap, ok := s.snapshot(w)
+	v, ok := s.view(w, r)
 	if !ok {
 		return
 	}
+	snap := v.filtered()
 	nsFilter := r.URL.Query().Get("namespace")
 	out := []policySummary{}
 	for _, pol := range snap.Policies {
@@ -124,11 +132,16 @@ func (s *Server) handlePolicyList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePolicyGet(w http.ResponseWriter, r *http.Request) {
-	snap, ok := s.snapshot(w)
+	v, ok := s.view(w, r)
 	if !ok {
 		return
 	}
+	snap := v.full
 	ns, name := chi.URLParam(r, "ns"), chi.URLParam(r, "name")
+	if !v.visible(ns) {
+		notVisible(w, "networkpolicy "+ns+"/"+name)
+		return
+	}
 	for _, pol := range snap.Policies {
 		if pol.Namespace != ns || pol.Name != name {
 			continue

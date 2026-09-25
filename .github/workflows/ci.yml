@@ -61,7 +61,7 @@ jobs:
       - run: helm lint deploy/helm/k8s-firewall-ui
       - run: helm template test deploy/helm/k8s-firewall-ui > /dev/null
       - run: helm template test deploy/helm/k8s-firewall-ui --set readOnly=true > /dev/null
-      - run: helm template test deploy/helm/k8s-firewall-ui --set auth.mode=token > /dev/null
+      - run: helm template test deploy/helm/k8s-firewall-ui --set auth.mode=token --set auth.restrictReads=true > /dev/null
       - run: helm template test deploy/helm/k8s-firewall-ui --set auth.mode=proxy --set networkPolicy.enabled=true > /dev/null
       - run: >-
           helm template test deploy/helm/k8s-firewall-ui --set tls.enabled=true --set tls.secretName=tls

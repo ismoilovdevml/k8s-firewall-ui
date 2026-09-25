@@ -49,10 +49,11 @@ func exportable(pol *networkingv1.NetworkPolicy) *networkingv1.NetworkPolicy {
 // handleExport streams all (or one namespace's) policies as a multi-document
 // YAML file.
 func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
-	snap, ok := s.snapshot(w)
+	v, ok := s.view(w, r)
 	if !ok {
 		return
 	}
+	snap := v.filtered()
 	ns := r.URL.Query().Get("namespace")
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "# NetworkPolicies exported by k8s-firewall-ui at %s\n", time.Now().UTC().Format(time.RFC3339))

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { deletePolicy, editorToken, signIn, signOut, viewerToken } from './helpers'
+import { deletePolicy, editorToken, signIn, signOut, tenantToken, viewerToken } from './helpers'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -192,4 +192,26 @@ test('editing shows a review diff and impact before applying', async ({ page }) 
 test('builder previews impact while drawing', async ({ page }) => {
   await page.goto('/builder')
   await expect(page.getByText('impact preview')).toBeVisible()
+})
+
+test('a tenant sees only their own namespace', async ({ page }) => {
+  test.skip(!tenantToken, 'FWUI_TENANT_TOKEN not set')
+  await signOut(page)
+  await signIn(page, tenantToken)
+  await expect(page.getByText('scoped to your namespaces')).toBeVisible()
+  // Overview lists only shop.
+  await expect(page.getByRole('button', { name: /shop/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /payments/ })).toHaveCount(0)
+  await expect(page.getByText('DNS_EGRESS_BLOCKED')).toHaveCount(0) // a payments finding
+  // Policies from other tenants are hidden and answer 404.
+  await page.goto('/policies')
+  await expect(page.getByRole('link', { name: 'default-deny-all' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'ledger-db-ingress' })).toHaveCount(0)
+  const res = await page.request.get('/api/v1/namespaces/payments/networkpolicies/ledger-db-ingress')
+  expect(res.status()).toBe(404)
+  // The tenant may edit in shop.
+  await page.goto('/policies/shop/cart-to-redis')
+  await expect(page.getByRole('button', { name: 'Delete' })).toBeEnabled()
+  await page.screenshot({ path: 'e2e-results/shots/tenant.png', fullPage: true })
+  await signOut(page)
 })

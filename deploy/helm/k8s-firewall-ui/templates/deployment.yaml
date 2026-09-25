@@ -59,6 +59,9 @@ spec:
             - --auth-proxy-user-header={{ .Values.auth.proxy.userHeader }}
             - --auth-proxy-groups-header={{ .Values.auth.proxy.groupsHeader }}
             {{- end }}
+            {{- if and .Values.auth.restrictReads (ne .Values.auth.mode "none") }}
+            - --restrict-reads
+            {{- end }}
             {{- if .Values.auth.secureCookies }}
             - --secure-cookies
             {{- end }}

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -172,5 +174,56 @@ func TestLoginRateLimit(t *testing.T) {
 	}
 	if !a.allowLogin("5.6.7.8") {
 		t.Fatal("limits must be per IP")
+	}
+}
+
+func TestVisibleNamespaces(t *testing.T) {
+	// alice may list NetworkPolicies only in "team-a"; bob cluster-wide.
+	calls := 0
+	newClient := func(c *rest.Config) (kubernetes.Interface, error) {
+		user := c.Impersonate.UserName
+		cs := fake.NewClientset()
+		cs.PrependReactor("create", "selfsubjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
+			calls++
+			review := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)
+			ns := review.Spec.ResourceAttributes.Namespace
+			review.Status.Allowed = user == "bob" || (user == "alice" && ns == "team-a")
+			return true, review, nil
+		})
+		return cs, nil
+	}
+	a, err := New(Config{Mode: ModeProxy, Base: &rest.Config{Host: "https://k8s"}, RestrictReads: true, NewClient: newClient})
+	if err != nil {
+		t.Fatal(err)
+	}
+	namespaces := []string{"team-a", "team-b", "kube-system"}
+
+	ctx := WithUser(context.Background(), &User{Name: "alice"})
+	vis, err := a.VisibleNamespaces(ctx, namespaces)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vis.All || !vis.Visible("team-a") || vis.Visible("team-b") || vis.Visible("kube-system") {
+		t.Fatalf("alice visibility = %+v", vis)
+	}
+	before := calls
+	if _, err := a.VisibleNamespaces(ctx, namespaces); err != nil || calls != before {
+		t.Fatalf("second lookup should be cached (calls %d -> %d)", before, calls)
+	}
+	// A namespace unknown to the cache forces a fresh check.
+	if vis, _ := a.VisibleNamespaces(ctx, append(namespaces, "team-c")); vis.Visible("team-c") || calls == before {
+		t.Fatalf("new namespace not re-checked (calls %d)", calls)
+	}
+
+	bob := WithUser(context.Background(), &User{Name: "bob"})
+	before = calls
+	vis, _ = a.VisibleNamespaces(bob, namespaces)
+	if !vis.All || calls != before+1 {
+		t.Fatalf("cluster-wide reader should short-circuit with one check: %+v, %d calls", vis, calls-before)
+	}
+
+	open, _ := New(Config{Mode: ModeProxy, Base: &rest.Config{}, NewClient: newClient})
+	if vis, _ := open.VisibleNamespaces(ctx, namespaces); !vis.All {
+		t.Fatal("without RestrictReads everything is visible")
 	}
 }

@@ -49,6 +49,7 @@ type config struct {
 	logLevel          string
 	shutdownTimeout   time.Duration
 	demo              bool
+	restrictReads     bool
 }
 
 func main() {
@@ -72,6 +73,7 @@ func main() {
 	flags.StringVar(&c.logFormat, "log-format", "text", "log format: text | json")
 	flags.StringVar(&c.logLevel, "log-level", "info", "log level: debug | info | warn | error")
 	flags.DurationVar(&c.shutdownTimeout, "shutdown-timeout", 15*time.Second, "graceful shutdown timeout")
+	flags.BoolVar(&c.restrictReads, "restrict-reads", false, "token/proxy mode: show each user only namespaces where they may list NetworkPolicies")
 	flags.BoolVar(&c.demo, "demo", false, "run against a built-in in-memory sample cluster (no Kubernetes needed)")
 	showVersion := flags.Bool("version", false, "print version and exit")
 	_ = flags.Parse(os.Args[1:])
@@ -195,7 +197,11 @@ func run(ctx context.Context, c config, logger *slog.Logger) error {
 		SessionSecret: secret, SessionTTL: c.sessionTTL,
 		SecureCookie: c.secureCookie || c.tlsCert != "",
 		UserHeader:   c.proxyUserHeader, GroupsHeader: c.proxyGroupsHeader,
+		RestrictReads: c.restrictReads,
 	})
+	if c.restrictReads && mode == auth.ModeNone {
+		logger.Warn("--restrict-reads has no effect with --auth-mode=none")
+	}
 	if err != nil {
 		return err
 	}

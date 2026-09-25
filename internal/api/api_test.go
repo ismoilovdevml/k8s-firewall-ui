@@ -10,10 +10,14 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/audit"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/auth"
@@ -323,5 +327,71 @@ func TestNamespaceTopology(t *testing.T) {
 		if e.Source == "a" && e.Counts.Blocked != 1 {
 			t.Errorf("a -> b should be blocked by b's default deny: %+v", e)
 		}
+	}
+}
+
+func TestRestrictReadsHidesOtherTenants(t *testing.T) {
+	// tenant-a may list NetworkPolicies only in namespace "a".
+	newClient := func(c *rest.Config) (kubernetes.Interface, error) {
+		cs := fake.NewClientset()
+		cs.PrependReactor("create", "selfsubjectaccessreviews", func(action k8stesting.Action) (bool, runtime.Object, error) {
+			review := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)
+			review.Status.Allowed = c.Impersonate.UserName == "tenant-a" && review.Spec.ResourceAttributes.Namespace == "a"
+			return true, review, nil
+		})
+		return cs, nil
+	}
+	authn, err := auth.New(auth.Config{Mode: auth.ModeProxy, Base: &rest.Config{Host: "https://k8s"}, RestrictReads: true, NewClient: newClient})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, false, authn, denyAll("a"), denyAll("b"))
+	h.audit.Record(audit.Entry{User: "x", Action: "create", Namespace: "b", Name: "secret-b", Result: audit.ResultSuccess})
+	as := []string{"X-Forwarded-User", "tenant-a"}
+
+	cases := []struct {
+		path       string
+		wantStatus int
+		mustHave   string
+		mustNot    string
+	}{
+		{"/api/v1/namespaces", 200, `"name":"a"`, `"name":"b"`},
+		{"/api/v1/networkpolicies", 200, `"namespace":"a"`, `"namespace":"b"`},
+		{"/api/v1/pods", 200, `"web-1"`, `"db-1"`},
+		{"/api/v1/namespaces/b/networkpolicies/deny-all", 404, "", ""},
+		{"/api/v1/namespaces/b/pods", 404, "", ""},
+		{"/api/v1/namespaces/b/isolation", 404, "", ""},
+		{"/api/v1/networkpolicies/export", 200, "namespace: a", "namespace: b"},
+		{"/api/v1/posture", 200, `"namespace":"a"`, `"namespace":"b"`},
+		{"/api/v1/topology?level=namespace", 200, `"namespace":"a"`, `"namespace":"b"`},
+		{"/api/v1/topology?namespaces=a,b", 200, `a/deployment/web`, `statefulset/db`},
+		{"/api/v1/audit", 200, "[]", "secret-b"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			w := h.do(http.MethodGet, tc.path, "", as...)
+			body := w.Body.String()
+			if w.Code != tc.wantStatus {
+				t.Fatalf("status %d, want %d: %s", w.Code, tc.wantStatus, body)
+			}
+			if tc.mustHave != "" && !strings.Contains(body, tc.mustHave) {
+				t.Errorf("missing %q in %s", tc.mustHave, body)
+			}
+			if tc.mustNot != "" && strings.Contains(body, tc.mustNot) {
+				t.Errorf("leaked %q in %s", tc.mustNot, body)
+			}
+		})
+	}
+
+	sim := `{"source":{"kind":"pod","namespace":"a","name":"web-1"},"destination":{"kind":"pod","namespace":"b","name":"db-1"}}`
+	if w := h.do(http.MethodPost, "/api/v1/simulate", sim, as...); w.Code != http.StatusNotFound {
+		t.Errorf("simulating into a hidden namespace: status %d", w.Code)
+	}
+	if w := h.do(http.MethodPost, "/api/v1/impact", `{"operation":"delete","namespace":"b","name":"deny-all"}`, as...); w.Code != http.StatusNotFound {
+		t.Errorf("impact in a hidden namespace: status %d", w.Code)
+	}
+	w := h.do(http.MethodGet, "/api/v1/auth/me", "", as...)
+	if !strings.Contains(w.Body.String(), `"restrictReads":true`) {
+		t.Errorf("me = %s", w.Body)
 	}
 }

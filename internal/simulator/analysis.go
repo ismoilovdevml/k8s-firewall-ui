@@ -149,11 +149,6 @@ func Analyze(snap *Snapshot) PostureReport {
 				Message: fmt.Sprintf("%d of %d pod(s) are not selected by any ingress policy and accept all traffic.", eligible-np.IngressIsolatedPods, eligible),
 			})
 		}
-		if !np.System {
-			report.Summary.Pods += eligible
-			report.Summary.IngressIsolatedPods += np.IngressIsolatedPods
-			report.Summary.EgressIsolatedPods += np.EgressIsolatedPods
-		}
 	}
 
 	sort.Slice(report.Namespaces, func(i, j int) bool { return report.Namespaces[i].Namespace < report.Namespaces[j].Namespace })
@@ -171,9 +166,23 @@ func Analyze(snap *Snapshot) PostureReport {
 		return policyName(a.Policy) < policyName(b.Policy)
 	})
 
+	summarize(&report)
+	return report
+}
+
+// summarize (re)computes the summary from the report's namespaces and
+// findings, so filtered reports stay self-consistent.
+func summarize(report *PostureReport) {
 	s := &report.Summary
-	s.Namespaces = len(report.Namespaces)
-	s.Policies = len(snap.Policies)
+	*s = PostureSummary{Namespaces: len(report.Namespaces)}
+	for _, np := range report.Namespaces {
+		s.Policies += np.Policies
+		if !np.System {
+			s.Pods += np.Pods - np.HostNetworkPods
+			s.IngressIsolatedPods += np.IngressIsolatedPods
+			s.EgressIsolatedPods += np.EgressIsolatedPods
+		}
+	}
 	for _, f := range report.Findings {
 		switch f.Severity {
 		case SeverityCritical:
@@ -185,7 +194,26 @@ func Analyze(snap *Snapshot) PostureReport {
 		}
 	}
 	s.Score = score(*s)
-	return report
+}
+
+// FilterPosture restricts a report to the namespaces visible() accepts
+// and recomputes the summary. Cluster-wide findings (no namespace) are
+// kept. Analysis always runs on the full cluster first, so cross-namespace
+// facts (e.g. a peer selector that matches pods elsewhere) stay correct.
+func FilterPosture(report PostureReport, visible func(string) bool) PostureReport {
+	out := PostureReport{Namespaces: []NamespacePosture{}, Findings: []Finding{}}
+	for _, np := range report.Namespaces {
+		if visible(np.Namespace) {
+			out.Namespaces = append(out.Namespaces, np)
+		}
+	}
+	for _, f := range report.Findings {
+		if f.Namespace == "" || visible(f.Namespace) {
+			out.Findings = append(out.Findings, f)
+		}
+	}
+	summarize(&out)
+	return out
 }
 
 func hasAllowAll(rules []normalizedRule) bool {

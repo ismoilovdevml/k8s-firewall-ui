@@ -21,7 +21,8 @@ echo "--- UI tests"
 make build >/dev/null
 export FWUI_TOKEN=$($KUBECTL -n fwui-e2e create token editor --duration=1h)
 export FWUI_VIEWER_TOKEN=$($KUBECTL -n fwui-e2e create token viewer --duration=1h)
-./bin/k8s-firewall-ui --listen ":$PORT" --auth-mode token --session-secret e2e-secret > e2e-server.log 2>&1 &
+export FWUI_TENANT_TOKEN=$($KUBECTL -n fwui-e2e create token shop-team --duration=1h)
+./bin/k8s-firewall-ui --listen ":$PORT" --auth-mode token --restrict-reads --session-secret e2e-secret > e2e-server.log 2>&1 &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null || true' EXIT
 for _ in $(seq 1 60); do curl -sf "localhost:$PORT/readyz" >/dev/null && break; sleep 1; done

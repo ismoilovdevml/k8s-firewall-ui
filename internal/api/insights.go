@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -15,12 +16,15 @@ import (
 
 // handlePosture serves the cluster-wide posture report plus cluster-level
 // caveats that affect how much the report can be trusted.
-func (s *Server) handlePosture(w http.ResponseWriter, _ *http.Request) {
-	snap, ok := s.snapshot(w)
+func (s *Server) handlePosture(w http.ResponseWriter, r *http.Request) {
+	v, ok := s.view(w, r)
 	if !ok {
 		return
 	}
-	report := simulator.Analyze(snap)
+	report := simulator.Analyze(v.full)
+	if !v.vis.All {
+		report = simulator.FilterPosture(report, v.visible)
+	}
 	switch {
 	case s.cniResult.Provider == "unknown":
 		report.Findings = append([]simulator.Finding{{
@@ -39,11 +43,16 @@ func (s *Server) handlePosture(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleNamespaceIsolation(w http.ResponseWriter, r *http.Request) {
-	snap, ok := s.snapshot(w)
+	v, ok := s.view(w, r)
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, simulator.NamespaceIsolation(snap, chi.URLParam(r, "ns")))
+	ns := chi.URLParam(r, "ns")
+	if !v.visible(ns) {
+		notVisible(w, "namespace "+ns)
+		return
+	}
+	writeJSON(w, http.StatusOK, simulator.NamespaceIsolation(v.full, ns))
 }
 
 type impactRequest struct {
@@ -91,20 +100,66 @@ func (s *Server) handleImpact(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "INVALID_INPUT", "operation must be apply or delete")
 		return
 	}
-	snap, ok := s.snapshot(w)
+	v, ok := s.view(w, r)
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, simulator.Impact(snap, req.Namespace, req.Name, proposed))
+	if !v.visible(req.Namespace) {
+		notVisible(w, "namespace "+req.Namespace)
+		return
+	}
+	res := simulator.Impact(v.full, req.Namespace, req.Name, proposed)
+	if !v.vis.All {
+		res = filterImpact(res, v.visible)
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
+	v, ok := s.view(w, r)
+	if !ok {
+		return
+	}
 	q := r.URL.Query()
 	limit, _ := strconv.Atoi(q.Get("limit"))
-	writeJSON(w, http.StatusOK, s.audit.List(audit.Filter{
+	entries := s.audit.List(audit.Filter{
 		Namespace: q.Get("namespace"), User: q.Get("user"), Action: q.Get("action"),
 		Query: q.Get("q"), Limit: limit,
-	}))
+	})
+	if !v.vis.All {
+		kept := entries[:0]
+		for _, e := range entries {
+			if v.visible(e.Namespace) {
+				kept = append(kept, e)
+			}
+		}
+		entries = kept
+	}
+	writeJSON(w, http.StatusOK, entries)
+}
+
+// filterImpact hides workloads in namespaces the user may not see.
+func filterImpact(res simulator.ImpactResult, visible func(string) bool) simulator.ImpactResult {
+	nsOf := func(id string) string { ns, _, _ := strings.Cut(id, "/"); return ns }
+	keepEdges := func(edges []simulator.ImpactEdge) []simulator.ImpactEdge {
+		out := []simulator.ImpactEdge{}
+		for _, e := range edges {
+			if visible(nsOf(e.Source)) && visible(nsOf(e.Target)) {
+				out = append(out, e)
+			}
+		}
+		return out
+	}
+	selected := []string{}
+	for _, id := range res.SelectedWorkloads {
+		if visible(nsOf(id)) {
+			selected = append(selected, id)
+		}
+	}
+	res.SelectedWorkloads = selected
+	res.NewlyBlocked = keepEdges(res.NewlyBlocked)
+	res.NewlyAllowed = keepEdges(res.NewlyAllowed)
+	return res
 }
 
 // handlePermissions reports whether the current user may change

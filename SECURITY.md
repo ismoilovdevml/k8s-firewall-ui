@@ -22,8 +22,11 @@ k8s-firewall-ui can change NetworkPolicies, so it is security-sensitive by desig
   `nosniff`, `Referrer-Policy: no-referrer`, HSTS when serving TLS.
 - **Proxy mode trusts identity headers.** Only the authenticating proxy may
   reach the pod; enforce this with the chart's `networkPolicy` values.
-- **Read visibility.** All authenticated users can view cluster-wide policy
-  and pod metadata from the server's cache. Writes are always per-user.
+- **Read visibility.** By default all authenticated users can view
+  cluster-wide policy and pod metadata from the server's cache. With
+  `--restrict-reads` each user sees only namespaces their RBAC lets them
+  list NetworkPolicies in (hidden namespaces answer 404). Writes are always
+  per-user.
 - **Mode `none`.** Anyone who can reach the service acts as the
   ServiceAccount. Use it only via `kubectl port-forward` or with `readOnly`.
 

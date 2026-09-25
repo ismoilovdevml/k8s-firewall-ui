@@ -86,6 +86,14 @@ export default function Layout() {
                     {me.user.groups.join(', ')}
                   </div>
                 )}
+                {me.restrictReads && (
+                  <div
+                    className="mt-1 text-[11px] text-sidebar-brand"
+                    title="You see only namespaces where your RBAC allows listing NetworkPolicies"
+                  >
+                    scoped to your namespaces
+                  </div>
+                )}
                 {me.mode === 'token' && (
                   <button
                     onClick={() => logout.mutate()}

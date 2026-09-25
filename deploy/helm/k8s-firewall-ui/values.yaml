@@ -22,6 +22,10 @@ auth:
   #         ServiceAccount gets impersonation rights instead of writes.
   #         Make sure ONLY the proxy can reach the pod (see networkPolicy).
   mode: none
+  # token/proxy only: each user sees only namespaces where their RBAC lets
+  # them list NetworkPolicies (multi-tenant clusters). Verdicts are still
+  # computed over the whole cluster.
+  restrictReads: false
   sessionTTL: 8h
   # Session cookie encryption secret (token mode). Leave empty to generate
   # one that persists across upgrades, or reference your own Secret.

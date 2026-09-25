@@ -18,9 +18,15 @@ author. The UI checks permissions per namespace (SelfSubjectAccessReview)
 and disables actions the user cannot perform.
 
 Reads (topology, posture, the simulator) come from the app's own informer
-cache, so every signed-in user can see policies, pods and namespaces
-across the cluster. Deploy one instance per trust boundary if that is not
-acceptable.
+cache. By default every signed-in user can see policies, pods and
+namespaces across the cluster. On multi-tenant clusters set
+`auth.restrictReads=true` (`--restrict-reads`): each user then sees only
+namespaces where their RBAC allows `list networkpolicies`. That covers
+namespace lists, pods, policies, export, posture findings, topology, impact
+previews, simulator endpoints and the audit log; hidden namespaces answer
+404 so their existence is not disclosed. Verdicts are still computed over
+the whole cluster, so they stay correct. Visibility is checked with
+SelfSubjectAccessReviews and cached per user for 60 seconds.
 
 ### Token mode
 
@@ -198,6 +204,7 @@ Every flag can also be set as an environment variable `FWUI_<FLAG>` (dashes beco
 | `--auth-mode` | `none` | `none` \| `token` \| `proxy` |
 | `--session-secret`, `--session-secret-file` | random | cookie encryption secret (token mode) |
 | `--session-ttl` | `8h` | session lifetime |
+| `--restrict-reads` | `false` | token/proxy mode: show only namespaces the user may list NetworkPolicies in |
 | `--auth-proxy-user-header` | `X-Forwarded-User` | proxy mode user header |
 | `--auth-proxy-groups-header` | `X-Forwarded-Groups` | proxy mode groups header (comma-separated) |
 | `--tls-cert-file`, `--tls-key-file` | | serve HTTPS |
