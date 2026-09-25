@@ -207,3 +207,100 @@ export interface NamespaceTopology {
   nodes: NamespaceGraphNode[]
   edges: NamespaceGraphEdge[]
 }
+
+// ---- access explorer / firewall console ----
+
+export type PeerKind = 'workload' | 'namespace' | 'external'
+
+export interface AccessPeer {
+  kind: PeerKind
+  namespace?: string
+  workload?: string
+  cidr?: string
+  label?: string
+}
+
+export interface AccessRuleMatch {
+  policy: PolicyRef
+  ruleIndex: number
+  explanation: string
+}
+
+export interface SideStatus {
+  applicable: boolean
+  isolated: boolean
+  allowed: boolean
+  rules?: AccessRuleMatch[]
+}
+
+export interface PortStatus {
+  name?: string
+  protocol: string
+  port: number
+  allowed: boolean
+}
+
+export type AccessVerdict = 'allowed' | 'blocked' | 'unconstrained' | 'partial'
+
+export interface AccessRow {
+  peer: AccessPeer
+  verdict: AccessVerdict
+  egress: SideStatus
+  ingress: SideStatus
+  ports?: PortStatus[]
+  counts?: VerdictCounts
+}
+
+export interface AccessSubject {
+  namespace: string
+  workload?: string
+}
+
+export interface AccessReport {
+  subject: AccessSubject
+  pods: string[]
+  ports?: ContainerPort[]
+  hostNetwork: boolean
+  ingressIsolated: boolean
+  egressIsolated: boolean
+  ingressPolicies: PolicyRef[]
+  egressPolicies: PolicyRef[]
+  inbound: AccessRow[]
+  outbound: AccessRow[]
+  workloads?: string[]
+}
+
+export type FlowDirection = 'inbound' | 'outbound'
+
+export interface PlanRequest {
+  subject: AccessSubject
+  direction: FlowDirection
+  peer: AccessPeer
+  action: 'allow' | 'block'
+  ports?: { protocol: string; port: number }[]
+  keepExternal: boolean
+}
+
+export interface PlannedChange {
+  operation: 'create' | 'update'
+  namespace: string
+  name: string
+  reason: string
+  before: string
+  after: string
+}
+
+export interface AccessPlan {
+  changes: PlannedChange[]
+  blockers: { policy: PolicyRef; ruleIndex: number; explanation: string }[]
+  notes: string[]
+  alreadyDone: boolean
+  verified: boolean
+  impact: ImpactResult
+  signature: string
+}
+
+export interface ApplyResponse {
+  plan: AccessPlan
+  results: { namespace: string; name: string; operation: string; error?: string }[]
+}

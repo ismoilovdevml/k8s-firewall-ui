@@ -92,8 +92,8 @@ func TestWorkloadSelectorAndManagedName(t *testing.T) {
 		t.Fatalf("per-pod label leaked into selector: %v", sel)
 	}
 	cases := map[string]string{
-		ManagedPolicyName(webWL, true):  "fwui-web-ingress",
-		ManagedPolicyName(dbWL, false):  "fwui-db-egress",
+		ManagedPolicyName(webWL, true):                                     "fwui-web-ingress",
+		ManagedPolicyName(dbWL, false):                                     "fwui-db-egress",
 		ManagedPolicyName(Peer{Kind: PeerNamespace, Namespace: "a"}, true): "fwui-namespace-ingress",
 		ManagedPolicyName(Peer{Kind: PeerWorkload, Workload: "deployment/My_App.v2" + strings.Repeat("x", 80)}, false)[:12]: "fwui-my-app-",
 	}

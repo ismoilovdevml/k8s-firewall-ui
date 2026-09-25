@@ -22,6 +22,7 @@ export function useSSEInvalidation() {
           void queryClient.invalidateQueries({ queryKey: ['topology'] })
           void queryClient.invalidateQueries({ queryKey: ['posture'] })
           void queryClient.invalidateQueries({ queryKey: ['isolation'] })
+          void queryClient.invalidateQueries({ queryKey: ['access'] })
         }
       } catch {
         // malformed event; ignore

@@ -22,6 +22,7 @@ import (
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/audit"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/auth"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/cni"
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/demo"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/kube"
 )
 
@@ -57,10 +58,17 @@ func newHarness(t *testing.T, readOnly bool, authn *auth.Authenticator, pols ...
 			{Name: "web-1", Namespace: "a", Labels: map[string]string{"app": "web"}, IP: "10.0.0.1", Owner: "deployment/web"},
 			{Name: "db-1", Namespace: "b", Labels: map[string]string{"app": "db"}, IP: "10.0.0.2", Owner: "statefulset/db"},
 		},
-		Namespaces: []kube.NamespaceInfo{{Name: "a"}, {Name: "b"}},
-		Policies:   pols,
+		// The API server labels every namespace with its name (1.21+).
+		Namespaces: []kube.NamespaceInfo{
+			{Name: "a", Labels: map[string]string{"kubernetes.io/metadata.name": "a"}},
+			{Name: "b", Labels: map[string]string{"kubernetes.io/metadata.name": "b"}},
+		},
+		Policies: pols,
 	}
 	cs := fake.NewClientset()
+	for _, verb := range []string{"create", "update", "delete"} {
+		cs.PrependReactor(verb, "networkpolicies", demo.DryRunReactor)
+	}
 	for _, p := range pols {
 		_ = cs.Tracker().Add(p)
 	}
@@ -426,5 +434,56 @@ func TestPostureReportDownloads(t *testing.T) {
 	}
 	if w := h.do(http.MethodGet, "/api/v1/posture/report?format=pdf", ""); w.Code != http.StatusBadRequest {
 		t.Errorf("unknown format status %d", w.Code)
+	}
+}
+
+func TestAccessPlanAndApply(t *testing.T) {
+	// b/db is default-deny ingress; allow a/web -> b/db through the planner.
+	h := newHarness(t, false, nil, denyAll("b"))
+
+	w := h.do(http.MethodGet, "/api/v1/access?namespace=a&pod=web-1", "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"workload":"deployment/web"`) {
+		t.Fatalf("access = %d %s", w.Code, w.Body)
+	}
+
+	req := `{"subject":{"namespace":"a","workload":"deployment/web"},"direction":"outbound",
+	         "peer":{"kind":"workload","namespace":"b","workload":"statefulset/db"},"action":"allow"}`
+	w = h.do(http.MethodPost, "/api/v1/access/plan", req)
+	var plan struct {
+		Signature string `json:"signature"`
+		Verified  bool   `json:"verified"`
+		Changes   []struct {
+			Operation, Namespace, Name, After string
+		} `json:"changes"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &plan); err != nil || w.Code != http.StatusOK {
+		t.Fatalf("plan = %d %s", w.Code, w.Body)
+	}
+	if !plan.Verified || len(plan.Changes) != 1 || plan.Changes[0].Name != "fwui-db-ingress" ||
+		!strings.Contains(plan.Changes[0].After, "app.kubernetes.io/managed-by: k8s-firewall-ui") {
+		t.Fatalf("plan = %+v", plan)
+	}
+
+	// Applying with a stale signature is refused.
+	stale := strings.Replace(req, `"action":"allow"}`, `"action":"allow","signature":"stale"}`, 1)
+	if w := h.do(http.MethodPost, "/api/v1/access/apply", stale); w.Code != http.StatusConflict {
+		t.Fatalf("stale apply status %d", w.Code)
+	}
+	signed := strings.Replace(req, `"action":"allow"}`, `"action":"allow","signature":"`+plan.Signature+`"}`, 1)
+	w = h.do(http.MethodPost, "/api/v1/access/apply", signed)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"operation":"create"`) {
+		t.Fatalf("apply = %d %s", w.Code, w.Body)
+	}
+	if _, err := h.cs.NetworkingV1().NetworkPolicies("b").Get(t.Context(), "fwui-db-ingress", metav1.GetOptions{}); err != nil {
+		t.Fatalf("policy not created: %v", err)
+	}
+	if e := h.audit.List(audit.Filter{}); len(e) != 1 || e[0].Name != "fwui-db-ingress" {
+		t.Fatalf("apply not audited: %+v", e)
+	}
+
+	// Writes go through the write guard (read-only instances refuse).
+	ro := newHarness(t, true, nil, denyAll("b"))
+	if w := ro.do(http.MethodPost, "/api/v1/access/apply", signed); w.Code != http.StatusForbidden {
+		t.Fatalf("read-only apply status %d", w.Code)
 	}
 }

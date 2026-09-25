@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { deletePolicy, editorToken, signOut } from './helpers'
+import { canConnect, deleteManaged } from './cluster'
 
 // Product walkthrough recorded as a video for the README
 // (docs/media/walkthrough.*). Runs only with WALKTHROUGH=1 because it is
@@ -82,7 +83,25 @@ test('walkthrough', async ({ page }) => {
   await page.getByRole('button', { name: 'Simulate' }).click()
   await caption(page, 'frontend → redis:6379 is blocked: frontend may only egress to the API tier', 3000)
 
-  // 6. Template + impact preview + create
+  // 6. Firewall console: fix the typo-broken flow with one click
+  deleteManaged('payments', 'fwui-ledger-db-ingress')
+  await page.getByRole('link', { name: /Firewall/ }).click()
+  await page.getByLabel('namespace').selectOption('payments')
+  await page.getByLabel('workload').selectOption('deployment/ledger-db')
+  await caption(page, 'Firewall: everything ledger-db can reach and everything that can reach it, per port', 3500)
+  const row = page.locator('section', { hasText: 'Inbound —' }).locator('tr[data-peer="payments/deployment/payments-api"]')
+  await row.scrollIntoViewIfNeeded()
+  await caption(page, 'payments-api → ledger-db is blocked (the policy has a label typo)', 3000)
+  await row.getByRole('button', { name: 'Allow', exact: true }).click()
+  await caption(page, 'One click: a verified plan with the exact YAML and its impact', 3500)
+  await page.getByRole('dialog').getByRole('button', { name: /^Allow — apply/ }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Done' }).click()
+  await expect(row).toContainText('allowed')
+  const works = canConnect('payments', 'payments-api', 'payments', 'ledger-db', 5432)
+  await caption(page, works ? 'Applied — and the real connection from the pod now succeeds ✓' : 'Applied', 3000)
+  deleteManaged('payments', 'fwui-ledger-db-ingress')
+
+  // 7. Template + impact preview + create
   await page.goto('/policies/new?namespace=analytics')
   await caption(page, 'Start from a proven template…', 1500)
   await page.getByRole('button', { name: /Default deny all \(keeps DNS\)/ }).click()
@@ -95,12 +114,12 @@ test('walkthrough', async ({ page }) => {
   await expect(page).toHaveURL(/default-deny-all$/)
   await caption(page, 'Applied with the signed-in user’s own credentials', 2200)
 
-  // 7. Audit
+  // 8. Audit
   await page.getByRole('link', { name: /Audit log/ }).click()
   await page.getByRole('button', { name: 'Details' }).first().click()
   await caption(page, 'Audit log: who changed what, from where, with a YAML diff', 3200)
 
-  // 8. Delete with reverse impact
+  // 9. Delete with reverse impact
   await page.goto('/policies/analytics/default-deny-all')
   await page.getByRole('button', { name: 'Delete' }).click()
   await expect(page.getByText(/become allowed/)).toBeVisible()

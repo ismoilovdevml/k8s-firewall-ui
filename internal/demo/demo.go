@@ -151,12 +151,14 @@ func Clientset() *fake.Clientset {
 	cs := fake.NewClientset(objs...)
 	// The fake tracker ignores dry-run; honor it so "Validate" never writes.
 	for _, verb := range []string{"create", "update", "delete"} {
-		cs.PrependReactor(verb, "networkpolicies", dryRunReactor)
+		cs.PrependReactor(verb, "networkpolicies", DryRunReactor)
 	}
 	return cs
 }
 
-func dryRunReactor(action k8stesting.Action) (bool, runtime.Object, error) {
+// DryRunReactor makes a fake clientset honour DryRun options (the tracker
+// otherwise persists dry-run writes).
+func DryRunReactor(action k8stesting.Action) (bool, runtime.Object, error) {
 	switch a := action.(type) {
 	case k8stesting.CreateActionImpl:
 		if len(a.CreateOptions.DryRun) > 0 {

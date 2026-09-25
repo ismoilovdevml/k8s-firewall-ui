@@ -14,6 +14,10 @@
 
   ![Overview](docs/screenshots/overview.png)
 
+- 🔥 **Firewall console**: pick any namespace, workload or pod and see every destination it can reach and every source that can reach it: pods, namespaces, DNS, external CIDRs and the internet. Each row shows per-port status, which side denies, and the exact policy rule that decides. **Allow** or **Block** any flow with one click. The planner writes least-privilege managed policies (`fwui-<workload>-ingress/egress`). When blocking a side that is open today, it isolates the side while keeping every other current connection. You review a simulator-verified plan with the YAML diff and impact, and apply it with your own RBAC. The end-to-end suite proves each click changes real traffic.
+
+  ![Firewall console](docs/screenshots/firewall.png)
+
 - 🗺️ **Topology viewer**: a namespace-level map of the whole cluster (fully open, partially open, blocked, unrestricted between every pair of teams) that drills down into a live workload graph. Green means allowed by policy, red means blocked, dotted means no policy applies. Filter by verdict, and click an edge to see which policies decide it.
 
   ![Topology](docs/screenshots/topology-namespaces.png)

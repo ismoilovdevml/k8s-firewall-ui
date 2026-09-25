@@ -7,6 +7,7 @@ import { Spinner } from './ui'
 
 const NAV = [
   { to: '/', label: 'Overview', hint: 'security posture' },
+  { to: '/firewall', label: 'Firewall', hint: 'allow & block traffic' },
   { to: '/topology', label: 'Topology', hint: 'live traffic map' },
   { to: '/policies', label: 'Policies', hint: 'rules on the cluster' },
   { to: '/simulator', label: 'Simulator', hint: 'test a connection' },

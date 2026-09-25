@@ -26,4 +26,5 @@ export FWUI_TENANT_TOKEN=$($KUBECTL -n fwui-e2e create token shop-team --duratio
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null || true' EXIT
 for _ in $(seq 1 60); do curl -sf "localhost:$PORT/readyz" >/dev/null && break; sleep 1; done
+export KUBECTL
 cd web && FWUI_URL="http://localhost:$PORT" npx playwright test "$@"

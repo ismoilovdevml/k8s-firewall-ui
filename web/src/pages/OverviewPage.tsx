@@ -226,6 +226,12 @@ function NamespaceRow({ ns, open, onToggle }: { ns: NamespacePosture; open: bool
           </div>
         </td>
         <td className="py-2 text-right">
+          <Link
+            to={`/firewall?namespace=${encodeURIComponent(ns.namespace)}`}
+            className="mr-3 whitespace-nowrap text-xs font-medium text-accent-strong hover:underline"
+          >
+            Firewall
+          </Link>
           {needsDeny && (
             <Link
               to={`/policies/new?template=default-deny-ingress&namespace=${encodeURIComponent(ns.namespace)}`}

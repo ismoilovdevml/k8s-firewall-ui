@@ -15,6 +15,7 @@ const PolicyNewPage = lazy(() => import('./pages/PolicyNewPage'))
 const SimulatorPage = lazy(() => import('./pages/SimulatorPage'))
 const BuilderPage = lazy(() => import('./pages/BuilderPage'))
 const AuditPage = lazy(() => import('./pages/AuditPage'))
+const FirewallPage = lazy(() => import('./pages/FirewallPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +42,7 @@ export default function App() {
             }
           >
             <Route index element={<OverviewPage />} />
+            <Route path="firewall" element={<FirewallPage />} />
             <Route path="topology" element={<TopologyPage />} />
             <Route path="policies" element={<PoliciesPage />} />
             <Route path="policies/new" element={<PolicyNewPage />} />

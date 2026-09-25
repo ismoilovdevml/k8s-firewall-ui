@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { ReactFlow, Background, Controls, MarkerType } from '@xyflow/react'
 import type { Edge, Node } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useNamespaces, useTopology } from '../api/queries'
 import { ApiError } from '../api/client'
 import type { EdgeVerdict, TopologyEdge } from '../api/types'
@@ -65,6 +65,7 @@ function WorkloadTopology({
   setSelected: React.Dispatch<React.SetStateAction<string[]>>
 }) {
   const { data: namespaces } = useNamespaces()
+  const navigate = useNavigate()
   const [activeEdge, setActiveEdge] = useState<TopologyEdge | null>(null)
   const [visible, setVisible] = useState<Record<EdgeVerdict, boolean>>({
     allowed: true,
@@ -188,6 +189,10 @@ function WorkloadTopology({
             edges={shownEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
+            onNodeClick={(_, node) => {
+              const info = (node.data as { info: { namespace: string; workload: string } }).info
+              navigate(`/firewall?namespace=${encodeURIComponent(info.namespace)}&workload=${encodeURIComponent(info.workload)}`)
+            }}
             onEdgeClick={(_, edge) => setActiveEdge((edge.data as { edge: TopologyEdge }).edge)}
             onPaneClick={() => setActiveEdge(null)}
             fitView

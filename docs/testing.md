@@ -39,7 +39,11 @@ The script:
    (`web/e2e/*.e2e.ts`): token sign-in, overview findings, the label-typo
    finding, topology filtering, simulator verdicts, template → impact
    preview → create → audit diff → delete, export, dry-run-first import,
-   and RBAC-disabled actions for the viewer.
+   and RBAC-disabled actions for the viewer. `firewall.e2e.ts` drives the
+   Firewall console and checks **real traffic from inside the pods** before
+   and after each click: Block cuts the connection (and DNS keeps working),
+   Allow restores it, and one click fixes the flow that the planted label
+   typo breaks.
 
 Videos, screenshots and traces of every test land in `web/e2e-results/`;
 the HTML report in `web/e2e-report/`.

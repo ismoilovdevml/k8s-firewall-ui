@@ -89,6 +89,14 @@ Warning codes: `HOSTNETWORK_UNDEFINED`, `NODE_LOCAL_TRAFFIC`, `DNS_EGRESS_BLOCKE
 
 Response: `{selectedWorkloads, newlyBlocked: [{source, target, before, after}], newlyAllowed, evaluatedPairs, truncated}`. Workload IDs are `<namespace>/<kind>/<name>`. Only reachability flips are reported (`allowed` ↔ `unconstrained` is not a flip).
 
+## Firewall console
+
+`GET /api/v1/access?namespace=ns[&workload=deployment/web | &pod=name]` → `{subject, pods, ports, ingressIsolated, egressIsolated, ingressPolicies, egressPolicies, inbound: [row], outbound: [row]}`. A row is `{peer: {kind: workload|namespace|external, namespace, workload, cidr, label}, verdict, egress, ingress, ports: [{port, protocol, allowed}], counts?}`. `egress` is the source side and `ingress` the destination side, each `{isolated, allowed, rules}`. Namespace subjects (no workload) aggregate workload pairs per peer namespace (`counts`, verdict `partial` when mixed).
+
+`POST /api/v1/access/plan` with `{subject, direction: inbound|outbound, peer, action: allow|block, ports?, keepExternal}` → `{changes: [{operation, namespace, name, reason, before, after, policy}], blockers, notes, alreadyDone, verified, impact, signature}`. Nothing is written.
+
+`POST /api/v1/access/apply` with the same body plus the reviewed `signature`. The server recomputes the plan, answers 409 `PLAN_CHANGED` if it differs, dry-runs every change, then applies them as the user (audited). Managed policies carry `app.kubernetes.io/managed-by: k8s-firewall-ui` and are named `fwui-<workload>-ingress|egress` or `fwui-namespace-ingress|egress`.
+
 ## Posture
 
 `GET /api/v1/posture` → `{summary, namespaces, findings}`.

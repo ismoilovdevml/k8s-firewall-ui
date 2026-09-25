@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiSend, apiSendYaml } from './client'
 import type {
+  AccessPlan,
+  AccessReport,
+  ApplyResponse,
   AuditEntry,
   AuthMe,
   ClusterInfo,
@@ -8,6 +11,7 @@ import type {
   ImportResponse,
   NamespaceInfo,
   NamespaceTopology,
+  PlanRequest,
   Permissions,
   PodInfo,
   PodIsolation,
@@ -247,5 +251,38 @@ export function useNamespaceTopology(enabled: boolean) {
     queryFn: () => apiGet<NamespaceTopology>('/api/v1/topology?level=namespace'),
     enabled,
     retry: false,
+  })
+}
+
+// ---- firewall console ----
+
+export function useAccess(namespace: string, workload: string) {
+  const params = new URLSearchParams({ namespace })
+  if (workload) params.set('workload', workload)
+  return useQuery({
+    // Invalidated with pods/networkpolicies (see useSSEInvalidation).
+    queryKey: ['access', namespace, workload],
+    queryFn: () => apiGet<AccessReport>(`/api/v1/access?${params}`),
+    enabled: namespace !== '',
+  })
+}
+
+export function usePlanAccess() {
+  return useMutation({
+    mutationFn: (req: PlanRequest) => apiSend<AccessPlan>('POST', '/api/v1/access/plan', req),
+  })
+}
+
+export function useApplyAccess() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (req: PlanRequest & { signature: string }) =>
+      apiSend<ApplyResponse>('POST', '/api/v1/access/apply', req),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['access'] })
+      void qc.invalidateQueries({ queryKey: ['networkpolicies'] })
+      void qc.invalidateQueries({ queryKey: ['posture'] })
+      void qc.invalidateQueries({ queryKey: ['topology'] })
+    },
   })
 }
