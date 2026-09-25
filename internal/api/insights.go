@@ -21,7 +21,14 @@ func (s *Server) handlePosture(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	report := simulator.Analyze(snap)
-	if !s.cniResult.EnforcesPolicies {
+	switch {
+	case s.cniResult.Provider == "unknown":
+		report.Findings = append([]simulator.Finding{{
+			Code: "CNI_UNVERIFIED", Severity: simulator.SeverityWarning,
+			Message: "The CNI could not be identified, so enforcement is unverified. Confirm your CNI enforces NetworkPolicies, then set --cni-override to silence this.",
+		}}, report.Findings...)
+		report.Summary.Warnings++
+	case !s.cniResult.EnforcesPolicies:
 		report.Findings = append([]simulator.Finding{{
 			Code: "CNI_NOT_ENFORCING", Severity: simulator.SeverityCritical,
 			Message: "The detected CNI (" + s.cniResult.Provider + ") does not enforce NetworkPolicies: none of these policies are in effect.",

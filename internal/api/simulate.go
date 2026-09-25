@@ -25,7 +25,13 @@ func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Cluster-level caveats belong on every simulation result.
-	if !s.cniResult.EnforcesPolicies {
+	switch {
+	case s.cniResult.Provider == "unknown":
+		res.Warnings = append(res.Warnings, simulator.Warning{
+			Code: "CNI_UNVERIFIED", Severity: "info",
+			Message: "The CNI could not be identified, so whether this verdict is enforced is unverified.",
+		})
+	case !s.cniResult.EnforcesPolicies:
 		res.Warnings = append(res.Warnings, simulator.Warning{
 			Code: "CNI_NOT_ENFORCING", Severity: "warning",
 			Message: "The detected CNI (" + s.cniResult.Provider + ") does not enforce NetworkPolicies — this verdict is theoretical.",

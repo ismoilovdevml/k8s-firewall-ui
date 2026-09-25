@@ -96,6 +96,13 @@ func Detect(ctx context.Context, cs kubernetes.Interface, override string) Resul
 		}
 	}
 
+	// k3s embeds flannel plus kube-router's network policy controller in its
+	// binary, so there is no CNI DaemonSet to find. Recognize it by the
+	// server version and honour --disable-network-policy from node args.
+	if res.Provider == "unknown" {
+		detectK3s(ctx, cs, &res)
+	}
+
 	groups, err := cs.Discovery().ServerGroups()
 	if err != nil {
 		res.Warnings = append(res.Warnings, fmt.Sprintf("API group discovery failed: %v", err))
@@ -136,4 +143,30 @@ func Detect(ctx context.Context, cs kubernetes.Interface, override string) Resul
 			"AdminNetworkPolicy resources detected: this tool does not evaluate them yet, so simulation results may be incomplete.")
 	}
 	return res
+}
+
+func detectK3s(ctx context.Context, cs kubernetes.Interface, res *Result) {
+	v, err := cs.Discovery().ServerVersion()
+	if err != nil || !strings.Contains(v.GitVersion, "+k3s") {
+		return
+	}
+	res.Provider = "k3s"
+	res.EnforcesPolicies = true
+	res.Evidence = append(res.Evidence, fmt.Sprintf("server version %s: k3s embeds kube-router's network policy controller", v.GitVersion))
+
+	nodes, err := cs.CoreV1().Nodes().List(ctx, metav1.ListOptions{Limit: 20})
+	if err != nil {
+		res.Evidence = append(res.Evidence, "node args not readable; assuming the embedded network policy controller is enabled")
+		return
+	}
+	for _, n := range nodes.Items {
+		args := n.Annotations["k3s.io/node-args"]
+		if strings.Contains(args, "--disable-network-policy") {
+			res.EnforcesPolicies = false
+			res.Evidence = append(res.Evidence, "node "+n.Name+" runs k3s with --disable-network-policy")
+			res.Warnings = append(res.Warnings,
+				"k3s runs with --disable-network-policy: NetworkPolicies are accepted but not enforced. Remove the flag or install another policy engine.")
+			return
+		}
+	}
 }

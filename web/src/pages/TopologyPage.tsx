@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { ReactFlow, Background, Controls, MarkerType } from '@xyflow/react'
 import type { Edge, Node } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { Link } from 'react-router-dom'
 import { useNamespaces, useTopology } from '../api/queries'
 import { ApiError } from '../api/client'
 import type { EdgeVerdict, TopologyEdge } from '../api/types'
@@ -20,6 +21,11 @@ export default function TopologyPage() {
   const { data: namespaces } = useNamespaces()
   const [selected, setSelected] = useState<string[]>([])
   const [activeEdge, setActiveEdge] = useState<TopologyEdge | null>(null)
+  const [visible, setVisible] = useState<Record<EdgeVerdict, boolean>>({
+    allowed: true,
+    blocked: true,
+    unconstrained: true,
+  })
 
   const topology = useTopology(selected)
 
@@ -42,14 +48,24 @@ export default function TopologyPage() {
         data: { edge: e },
       }
     })
+    // Layout uses every edge so hiding a verdict does not move nodes.
     return { nodes: layoutGraph(rfNodes, rfEdges), edges: rfEdges }
+  }, [topology.data])
+  const shownEdges = useMemo(
+    () => edges.filter((e) => visible[(e.data as { edge: TopologyEdge }).edge.verdict]),
+    [edges, visible],
+  )
+  const counts = useMemo(() => {
+    const c: Record<EdgeVerdict, number> = { allowed: 0, blocked: 0, unconstrained: 0 }
+    for (const e of topology.data?.edges ?? []) c[e.verdict]++
+    return c
   }, [topology.data])
 
   const toggle = (ns: string) =>
     setSelected((cur) => (cur.includes(ns) ? cur.filter((n) => n !== ns) : [...cur, ns]))
 
   const userNamespaces = (namespaces ?? []).filter(
-    (ns) => !ns.name.startsWith('kube-') && ns.name !== 'local-path-storage',
+    (ns) => !ns.name.startsWith('kube-') && ns.name !== 'local-path-storage' && ns.podCount > 0,
   )
 
   return (
@@ -75,9 +91,18 @@ export default function TopologyPage() {
             <span className="text-sm text-muted">No user namespaces with pods yet.</span>
           )}
         </div>
-        <div className="mt-2 flex gap-4 font-mono text-xs text-muted">
+        <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-xs text-muted">
+          <span className="uppercase tracking-wide text-quiet">show</span>
           {(Object.keys(VERDICT_STYLE) as EdgeVerdict[]).map((v) => (
-            <span key={v} className="flex items-center gap-1.5">
+            <button
+              key={v}
+              aria-pressed={visible[v]}
+              onClick={() => setVisible((cur) => ({ ...cur, [v]: !cur[v] }))}
+              title={VERDICT_STYLE[v].label}
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 transition ${
+                visible[v] ? 'border-edge bg-surface text-text' : 'border-transparent text-quiet line-through opacity-60'
+              }`}
+            >
               <svg width="24" height="6">
                 <line
                   x1="0"
@@ -90,7 +115,8 @@ export default function TopologyPage() {
                 />
               </svg>
               {v}
-            </span>
+              {topology.data && <span className="text-quiet">{counts[v]}</span>}
+            </button>
           ))}
         </div>
       </div>
@@ -112,7 +138,7 @@ export default function TopologyPage() {
         {nodes.length > 0 && (
           <ReactFlow
             nodes={nodes}
-            edges={edges}
+            edges={shownEdges}
             nodeTypes={nodeTypes}
             onEdgeClick={(_, edge) => setActiveEdge((edge.data as { edge: TopologyEdge }).edge)}
             onPaneClick={() => setActiveEdge(null)}
@@ -153,8 +179,10 @@ export default function TopologyPage() {
               {activeEdge.policies?.length ? (
                 <ul className="mt-1 space-y-1">
                   {activeEdge.policies.map((p) => (
-                    <li key={`${p.namespace}/${p.name}`} className="font-mono text-sm text-text">
-                      {p.namespace}/{p.name}
+                    <li key={`${p.namespace}/${p.name}`} className="font-mono text-sm">
+                      <Link to={`/policies/${p.namespace}/${p.name}`} className="text-accent-strong hover:underline">
+                        {p.namespace}/{p.name}
+                      </Link>
                     </li>
                   ))}
                 </ul>

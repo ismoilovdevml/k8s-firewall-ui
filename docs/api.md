@@ -95,7 +95,7 @@ Response: `{selectedWorkloads, newlyBlocked: [{source, target, before, after}], 
 
 - `summary`: pods, isolated pods per direction, policy count, `score` (0–100), finding counts. Covers application pods only (non-`kube-*` namespaces, non-hostNetwork).
 - `namespaces[]`: pods, hostNetworkPods, policies, ingress/egress isolated pods, `defaultDenyIngress/Egress`.
-- `findings[]`: `{code, severity: critical|warning|info, namespace, policy?, message}`. Codes: `CNI_NOT_ENFORCING`, `DNS_EGRESS_BLOCKED`, `NAMESPACE_UNPROTECTED`, `PODS_NOT_ISOLATED`, `POLICY_SELECTS_NOTHING`, `PEER_MATCHES_NOTHING`, `ALLOW_ALL_INGRESS`, `ALLOW_ALL_EGRESS`, `IPBLOCK_ANY`, `HOSTNETWORK_SELECTED`. Findings in `kube-*` namespaces are downgraded one severity step.
+- `findings[]`: `{code, severity: critical|warning|info, namespace, policy?, message}`. Codes: `CNI_NOT_ENFORCING`, `CNI_UNVERIFIED`, `DNS_EGRESS_BLOCKED`, `NAMESPACE_UNPROTECTED`, `PODS_NOT_ISOLATED`, `POLICY_SELECTS_NOTHING`, `PEER_MATCHES_NOTHING`, `ALLOW_ALL_INGRESS`, `ALLOW_ALL_EGRESS`, `IPBLOCK_ANY`, `HOSTNETWORK_SELECTED`. Findings in `kube-*` namespaces are downgraded one severity step.
 
 `GET /api/v1/namespaces/{ns}/isolation` → each pod with the `ingressPolicies` and `egressPolicies` isolating it.
 

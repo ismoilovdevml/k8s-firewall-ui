@@ -83,7 +83,7 @@ export default function SimulatorPage() {
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
         <section className="rounded-md border border-edge bg-surface p-4">
           <h2 className="font-mono text-[11px] uppercase tracking-wide text-quiet">source pod</h2>
-          <PodPicker value={src} onChange={setSrc} />
+          <PodPicker label="source" value={src} onChange={setSrc} />
         </section>
 
         <section className="rounded-md border border-edge bg-surface p-4">
@@ -105,6 +105,7 @@ export default function SimulatorPage() {
           </div>
           {dstKind === 'pod' ? (
             <PodPicker
+              label="destination"
               value={{ namespace: dst.namespace, name: dst.name }}
               onChange={(v) => setDst({ ...dst, ...v })}
             />
@@ -125,6 +126,7 @@ export default function SimulatorPage() {
             protocol
           </span>
           <select
+            aria-label="protocol"
             value={protocol}
             onChange={(e) => setProtocol(e.target.value as typeof protocol)}
             className="rounded border border-edge bg-surface px-2 py-1.5 font-mono text-sm text-text focus:border-accent focus:outline-none"
@@ -139,6 +141,7 @@ export default function SimulatorPage() {
             port
           </span>
           <input
+            aria-label="port"
             value={port}
             onChange={(e) => setPort(e.target.value.replace(/\D/g, ''))}
             placeholder="any"
@@ -212,9 +215,11 @@ export default function SimulatorPage() {
 }
 
 function PodPicker({
+  label,
   value,
   onChange,
 }: {
+  label: string
   value: { namespace: string; name: string }
   onChange: (v: { namespace: string; name: string }) => void
 }) {
@@ -224,6 +229,7 @@ function PodPicker({
   return (
     <div className="mt-2 space-y-2">
       <select
+        aria-label={`${label} namespace`}
         value={value.namespace}
         onChange={(e) => onChange({ namespace: e.target.value, name: '' })}
         className="w-full rounded border border-edge bg-base px-2 py-1.5 font-mono text-sm text-text focus:border-accent focus:outline-none"
@@ -238,6 +244,7 @@ function PodPicker({
           ))}
       </select>
       <select
+        aria-label={`${label} pod`}
         value={value.name}
         onChange={(e) => onChange({ ...value, name: e.target.value })}
         disabled={value.namespace === ''}

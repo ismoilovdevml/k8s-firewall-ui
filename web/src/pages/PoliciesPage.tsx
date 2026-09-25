@@ -11,7 +11,8 @@ export default function PoliciesPage() {
   const { data: namespaces } = useNamespaces()
   const { data: policies, isLoading } = usePolicies(namespace || undefined)
   const { data: info } = useClusterInfo()
-  const cniEnforces = info?.cni?.enforcesPolicies
+  // Unknown CNI = unverified, not "not enforced".
+  const cniEnforces = info?.cni?.provider === 'unknown' ? undefined : info?.cni?.enforcesPolicies
   const { data: posture } = usePosture()
   const issues = new Map<string, number>()
   for (const f of posture?.findings ?? []) {

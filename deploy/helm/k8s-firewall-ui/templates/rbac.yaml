@@ -28,9 +28,13 @@ rules:
     resources: ["users", "groups"]
     verbs: ["impersonate"]
   {{- end }}
-  # CNI detection: kube-system DaemonSets + API group discovery.
+  # CNI detection: kube-system DaemonSets, API group discovery, and k3s
+  # node args (--disable-network-policy).
   - apiGroups: ["apps"]
     resources: ["daemonsets"]
+    verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["nodes"]
     verbs: ["list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

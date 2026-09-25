@@ -24,7 +24,13 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen flex-col">
-      {cni && !cni.enforcesPolicies && (
+      {cni && cni.provider === 'unknown' && (
+        <div className="border-b border-warn bg-warn-bg/60 px-4 py-2 text-sm text-warn-text">
+          ⚠ Could not identify the CNI, so NetworkPolicy enforcement is unverified. Confirm your CNI
+          enforces policies (then start the server with <code>--cni-override</code>).
+        </div>
+      )}
+      {cni && cni.provider !== 'unknown' && !cni.enforcesPolicies && (
         <div className="border-b border-warn bg-warn-bg px-4 py-2 text-sm font-medium text-warn-text">
           ⚠ Policies are not enforced on this cluster — CNI “{cni.provider}” accepts NetworkPolicies
           but ignores them. Everything below is theoretical until you install a policy engine.
@@ -97,6 +103,8 @@ export default function Layout() {
                 {cni &&
                   (cni.enforcesPolicies ? (
                     <span className="text-sidebar-brand">enforced ✓</span>
+                  ) : cni.provider === 'unknown' ? (
+                    <span className="text-warn-bg">unverified ?</span>
                   ) : (
                     <span className="font-semibold text-warn-bg">NOT enforced ✗</span>
                   ))}
