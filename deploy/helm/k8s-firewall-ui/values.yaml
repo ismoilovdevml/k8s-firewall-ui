@@ -75,6 +75,38 @@ podDisruptionBudget:
   minAvailable: 1
 
 # Dogfooding: restrict traffic to the UI pod itself.
+# Observed traffic ("learning mode"): a DaemonSet agent reads each node's
+# conntrack table and reports the connections pods actually make. The UI
+# shows them per workload and can build least-privilege policies from them.
+# Works with iptables/nftables data paths (kube-router, Calico iptables,
+# flannel, Cilium with kube-proxy, AWS VPC CNI, …); eBPF-only data paths
+# without conntrack show nothing. The agent runs with hostNetwork and
+# CAP_NET_ADMIN.
+flows:
+  enabled: false
+  # How long an observed flow is kept (in memory on the server).
+  retention: 24h
+  # Shared agent → server token. Leave empty to generate one that persists
+  # across upgrades, or reference your own Secret.
+  agentToken: ""
+  existingSecret: ""
+  existingSecretKey: agent-token
+  agent:
+    interval: 10s
+    # Defaults to the in-cluster Service URL.
+    serverURL: ""
+    # tls.enabled: key of tls.secretName holding the certificate the agent
+    # trusts (tls.crt for self-signed, ca.crt if your issuer adds one).
+    caKey: tls.crt
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {memory: 128Mi}
+    nodeSelector: {}
+    # Run on every node, including control-plane nodes.
+    tolerations:
+      - operator: Exists
+    priorityClassName: ""
+
 networkPolicy:
   enabled: false
   # Peers allowed to reach the UI. Empty = any source in the cluster.
@@ -83,6 +115,9 @@ networkPolicy:
   #  - namespaceSelector:
   #      matchLabels:
   #        kubernetes.io/metadata.name: ingress-nginx
+  # flows.enabled with ingressFrom set: node CIDRs the agents (hostNetwork)
+  # connect from. Traffic from the pod's own node is always allowed.
+  agentCIDRs: []
   # CIDR(s) of the Kubernetes API server for the egress allow rule.
   apiServerCIDRs:
     - 0.0.0.0/0

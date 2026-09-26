@@ -21,3 +21,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "k8s-firewall-ui.sessionSecretName" -}}
 {{- default (printf "%s-session" (include "k8s-firewall-ui.fullname" .)) .Values.auth.existingSecret -}}
 {{- end -}}
+
+{{- define "k8s-firewall-ui.agentSelectorLabels" -}}
+app.kubernetes.io/name: {{ include "k8s-firewall-ui.name" . }}-agent
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+{{- define "k8s-firewall-ui.agentSecretName" -}}
+{{- default (printf "%s-agent" (include "k8s-firewall-ui.fullname" .)) .Values.flows.existingSecret -}}
+{{- end -}}

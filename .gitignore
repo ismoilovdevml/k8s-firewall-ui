@@ -30,3 +30,4 @@ web/e2e-results/
 web/e2e-report/
 web/e2e-auth/
 e2e-server.log
+e2e-agent.log

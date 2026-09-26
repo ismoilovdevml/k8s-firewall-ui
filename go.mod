@@ -5,6 +5,8 @@ go 1.26.4
 require (
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/prometheus/client_golang v1.24.1
+	github.com/vishvananda/netlink v1.3.1
+	golang.org/x/sys v0.47.0
 	golang.org/x/time v0.14.0
 	k8s.io/api v0.36.2
 	k8s.io/apimachinery v0.36.2
@@ -37,12 +39,12 @@ require (
 	github.com/prometheus/common v0.70.1 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
+	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect

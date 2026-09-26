@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, errorMessage } from '../../api/client'
 import { useApplyAccess, usePlanAccess } from '../../api/queries'
-import type { AccessPlan, PlanRequest } from '../../api/types'
+import type { AccessPlan, AccessSubject, FlowDirection, PlanRequest } from '../../api/types'
 import DiffView from '../DiffView'
 import { flowText } from './flow'
 import { Badge, Button, Feedback, Modal } from '../ui'
@@ -12,12 +12,18 @@ import { Badge, Button, Feedback, Modal } from '../ui'
  * the change, the user reviews diffs and impact, and apply re-plans
  * server-side and refuses if anything changed in between.
  */
-export default function PlanDialog({ request, onClose }: { request: PlanRequest; onClose: () => void }) {
-  const [keepExternal, setKeepExternal] = useState(request.keepExternal)
-  const plan = usePlanAccess()
-  const apply = useApplyAccess()
-  const req = { ...request, keepExternal }
+type Source =
+  | { request: PlanRequest; learn?: undefined }
+  | { learn: { subject: AccessSubject; direction: FlowDirection }; request?: undefined }
+
+export default function PlanDialog({ request, learn, onClose }: Source & { onClose: () => void }) {
+  const [keepExternal, setKeepExternal] = useState(request?.keepExternal ?? true)
+  const endpoint = learn ? '/api/v1/flows/learn' : '/api/v1/access'
+  const plan = usePlanAccess(endpoint)
+  const apply = useApplyAccess(endpoint)
+  const req: object = learn ?? { ...request, keepExternal }
   const reqKey = JSON.stringify(req)
+  const action = learn ? 'learn' : request!.action
 
   useEffect(() => {
     apply.reset()
@@ -28,10 +34,13 @@ export default function PlanDialog({ request, onClose }: { request: PlanRequest;
   const p: AccessPlan | undefined = plan.data
   const done = apply.isSuccess && !apply.data.results.some((r) => r.error)
   const stale = apply.error instanceof ApiError && apply.error.code === 'PLAN_CHANGED'
-  const verb = request.action === 'allow' ? 'Allow' : 'Block'
+  const verb = action === 'allow' ? 'Allow' : action === 'block' ? 'Block' : 'Restrict'
+  const title = learn
+    ? `Allow only observed ${learn.direction} traffic for ${learn.subject.namespace}${learn.subject.workload ? '/' + learn.subject.workload : ''}`
+    : `${verb} ${flowText(request!)}`
 
   return (
-    <Modal title={`${verb} ${flowText(request)}`} onClose={onClose} wide>
+    <Modal title={title} onClose={onClose} wide>
       {plan.isPending && <p className="text-sm text-muted">Planning…</p>}
       {plan.isError && <Feedback tone="error">{errorMessage(plan.error)}</Feedback>}
 
@@ -45,7 +54,7 @@ export default function PlanDialog({ request, onClose }: { request: PlanRequest;
                 {p.verified ? (
                   <Badge tone="ok">✓ verified by the simulator</Badge>
                 ) : (
-                  <Badge tone="block">✕ cannot fully {request.action} automatically</Badge>
+                  <Badge tone="block">✕ cannot fully {action === 'learn' ? 'apply' : action} automatically</Badge>
                 )}
                 <span className="text-muted">
                   {p.changes.length} change{p.changes.length === 1 ? '' : 's'} ·{' '}
@@ -54,7 +63,7 @@ export default function PlanDialog({ request, onClose }: { request: PlanRequest;
                 </span>
               </div>
 
-              {request.action === 'block' && (
+              {action === 'block' && (
                 <label className="flex items-center gap-2 text-sm text-text">
                   <input type="checkbox" checked={keepExternal} onChange={(e) => setKeepExternal(e.target.checked)} />
                   Keep internet access if this workload has to be isolated (0.0.0.0/0 except private ranges)
@@ -132,7 +141,7 @@ export default function PlanDialog({ request, onClose }: { request: PlanRequest;
             </Button>
             {!p.alreadyDone && (
               <Button
-                variant={request.action === 'block' ? 'danger' : 'primary'}
+                variant={action === 'block' ? 'danger' : 'primary'}
                 disabled={p.changes.length === 0 || apply.isPending}
                 onClick={() =>
                   apply.mutate(

@@ -1,0 +1,90 @@
+{{- if .Values.flows.enabled }}
+{{- $scheme := ternary "https" "http" .Values.tls.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "k8s-firewall-ui.fullname" . }}-agent
+  labels:
+    {{- include "k8s-firewall-ui.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flow-agent
+spec:
+  selector:
+    matchLabels:
+      {{- include "k8s-firewall-ui.agentSelectorLabels" . | nindent 6 }}
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-firewall-ui.agentSelectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: flow-agent
+    spec:
+      # conntrack lives in the host network namespace. The agent only reads
+      # it (netlink dump) and talks to the server; it serves nothing.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.flows.agent.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - agent
+            - --server={{ .Values.flows.agent.serverURL | default (printf "%s://%s.%s.svc:%v" $scheme (include "k8s-firewall-ui.fullname" .) .Release.Namespace .Values.service.port) }}
+            - --interval={{ .Values.flows.agent.interval }}
+            - --log-format={{ .Values.logging.format }}
+            {{- if .Values.tls.enabled }}
+            - --ca-file=/etc/k8s-firewall-ui/tls/{{ .Values.flows.agent.caKey }}
+            {{- end }}
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: FWUI_AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-firewall-ui.agentSecretName" . }}
+                  key: {{ .Values.flows.existingSecretKey }}
+          securityContext:
+            # Root with only NET_ADMIN: required by the kernel to dump conntrack.
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+              add: [NET_ADMIN]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            {{- toYaml .Values.flows.agent.resources | nindent 12 }}
+          {{- if .Values.tls.enabled }}
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/k8s-firewall-ui/tls
+              readOnly: true
+          {{- end }}
+      {{- if .Values.tls.enabled }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.tls.secretName }}
+            items:
+              - key: {{ .Values.flows.agent.caKey }}
+                path: {{ .Values.flows.agent.caKey }}
+      {{- end }}
+      {{- with .Values.flows.agent.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        {{- toYaml .Values.flows.agent.tolerations | nindent 8 }}
+{{- end }}

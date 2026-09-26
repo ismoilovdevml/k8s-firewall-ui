@@ -199,7 +199,35 @@ errors, 429 and 5xx responses. It never delays or fails the change itself.
 With `networkPolicy.enabled`, allow egress to the webhook via
 `networkPolicy.extraEgress`.
 
-## 7. Hardening checklist
+## 7. Observed traffic (learning mode)
+
+```yaml
+flows:
+  enabled: true
+```
+
+This deploys a DaemonSet agent (`k8s-firewall-ui agent`) on every node. Every
+`flows.agent.interval` it dumps the node's conntrack table over netlink and
+posts the connections to the server with a shared token (a generated Secret,
+or `flows.existingSecret`). The Firewall page then shows, per namespace or
+workload, who it actually talks to (pods, external IPs, ports) and whether the
+current policies allow it, and can build a least-privilege policy from it.
+
+- Needs `hostNetwork` and `CAP_NET_ADMIN` (read-only use of conntrack). It
+  serves no port and mounts no service account token.
+- Works on iptables/nftables data paths (kube-router, k3s, Calico iptables,
+  flannel, Cilium with kube-proxy, AWS VPC CNI). eBPF-only data paths that
+  bypass conntrack report nothing.
+- Only established connections are recorded: packets a policy drops never
+  show up, so observe *before* locking a workload down.
+- Flows live in the server's memory (`flows.retention`). With several
+  replicas, each agent posts to one of them through the Service, so each
+  replica sees part of the traffic; run one replica while learning.
+- With `tls.enabled`, agents trust `tls.secretName`'s `flows.agent.caKey`.
+  With `networkPolicy.ingressFrom` set, add the node CIDRs to
+  `networkPolicy.agentCIDRs`.
+
+## 8. Hardening checklist
 
 - [ ] `auth.mode` is `token` or `proxy` for anything beyond a single operator
 - [ ] HTTPS end to end (`tls.enabled`, or ingress TLS + `auth.secureCookies`)
@@ -236,6 +264,8 @@ Every flag can also be set as an environment variable `FWUI_<FLAG>` (dashes beco
 | `--audit-buffer` | `1000` | audit entries kept in memory |
 | `--notify-webhook-url` | | POST every change to this URL (use `FWUI_NOTIFY_WEBHOOK_URL`) |
 | `--notify-format` | `json` | `json` (audit entry) \| `slack` (text) |
+| `--agent-token`, `--agent-token-file` | | enable flow ingestion from node agents (use `FWUI_AGENT_TOKEN`) |
+| `--flow-retention` | `24h` | how long observed flows are kept |
 | `--log-format` | `text` | `text` \| `json` |
 | `--log-level` | `info` | `debug` \| `info` \| `warn` \| `error` |
 | `--shutdown-timeout` | `15s` | graceful shutdown timeout |

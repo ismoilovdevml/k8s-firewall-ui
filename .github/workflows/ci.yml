@@ -65,6 +65,7 @@ jobs:
       - run: helm template test deploy/helm/k8s-firewall-ui --set readOnly=true > /dev/null
       - run: helm template test deploy/helm/k8s-firewall-ui --set auth.mode=token --set auth.restrictReads=true > /dev/null
       - run: helm template test deploy/helm/k8s-firewall-ui --set auth.mode=proxy --set networkPolicy.enabled=true > /dev/null
+      - run: helm template test deploy/helm/k8s-firewall-ui --set flows.enabled=true --set tls.enabled=true --set tls.secretName=tls --set networkPolicy.enabled=true > /dev/null
       - run: >-
           helm template test deploy/helm/k8s-firewall-ui --set tls.enabled=true --set tls.secretName=tls
           --set metrics.serviceMonitor.enabled=true --set podDisruptionBudget.enabled=true
@@ -124,6 +125,8 @@ jobs:
         run: npm ci && npx playwright install --with-deps chromium
       - name: Run end-to-end suite
         run: hack/e2e/run.sh
+        env:
+          AGENT_SUDO: sudo
       - name: Upload videos, screenshots and report
         if: always()
         uses: actions/upload-artifact@v4
@@ -133,4 +136,5 @@ jobs:
             web/e2e-results
             web/e2e-report
             e2e-server.log
+            e2e-agent.log
           retention-days: 14

@@ -162,6 +162,12 @@ func (s *Server) handleAccessApply(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "PLAN_FAILED", err.Error())
 		return
 	}
+	s.applyPlan(w, r, plan, signature)
+}
+
+// applyPlan checks the reviewed signature, dry-runs every change, then
+// applies them in order as the user, auditing each write.
+func (s *Server) applyPlan(w http.ResponseWriter, r *http.Request, plan simulator.Plan, signature string) {
 	if signature != planSignature(plan) {
 		writeError(w, http.StatusConflict, "PLAN_CHANGED",
 			"the cluster changed since you reviewed this plan — review the new plan and apply again")

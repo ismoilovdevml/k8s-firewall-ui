@@ -54,3 +54,13 @@ func findPod(snap *Snapshot, ep Endpoint) (kube.PodInfo, error) {
 	}
 	return kube.PodInfo{}, fmt.Errorf("pod %s/%s not found", ep.Namespace, ep.Name)
 }
+
+// IngressFromIP evaluates only the destination's ingress side for traffic
+// from an address outside the cluster's pods (no source egress check).
+func IngressFromIP(snap *Snapshot, srcIP string, dst Endpoint, port *PortQuery) (SideResult, error) {
+	pod, err := findPod(snap, dst)
+	if err != nil {
+		return SideResult{}, err
+	}
+	return evalSide(snap, pod, dirIngress, ipTarget(srcIP), port), nil
+}

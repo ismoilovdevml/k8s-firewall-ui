@@ -3,6 +3,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"flag"
 	"fmt"
@@ -25,6 +27,7 @@ import (
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/auth"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/cni"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/demo"
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/flows"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/kube"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/lint"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/notify"
@@ -55,11 +58,17 @@ type config struct {
 	restrictReads     bool
 	notifyURL         string
 	notifyFormat      string
+	agentToken        string
+	agentTokenFile    string
+	flowRetention     time.Duration
 }
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "lint" {
 		os.Exit(lint.Main(os.Args[2:], os.Stdin, os.Stdout, os.Stderr, loadClusterSnapshot))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "agent" {
+		os.Exit(runAgent(os.Args[2:]))
 	}
 	var c config
 	flags := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
@@ -83,6 +92,9 @@ func main() {
 	flags.DurationVar(&c.shutdownTimeout, "shutdown-timeout", 15*time.Second, "graceful shutdown timeout")
 	flags.StringVar(&c.notifyURL, "notify-webhook-url", "", "POST every policy change to this webhook (prefer FWUI_NOTIFY_WEBHOOK_URL: the URL is a secret)")
 	flags.StringVar(&c.notifyFormat, "notify-format", "json", "webhook payload: json (audit entry) | slack (Slack-compatible text)")
+	flags.StringVar(&c.agentToken, "agent-token", "", "enable observed-traffic collection; node agents authenticate with this token (prefer FWUI_AGENT_TOKEN or --agent-token-file)")
+	flags.StringVar(&c.agentTokenFile, "agent-token-file", "", "file containing the agent token")
+	flags.DurationVar(&c.flowRetention, "flow-retention", 24*time.Hour, "how long observed flows are kept")
 	flags.BoolVar(&c.restrictReads, "restrict-reads", false, "token/proxy mode: show each user only namespaces where they may list NetworkPolicies")
 	flags.BoolVar(&c.demo, "demo", false, "run against a built-in in-memory sample cluster (no Kubernetes needed)")
 	showVersion := flags.Bool("version", false, "print version and exit")
@@ -228,11 +240,26 @@ func run(ctx context.Context, c config, logger *slog.Logger) error {
 		logger.Info("policy change notifications enabled", "format", format)
 	}
 
+	agentToken := c.agentToken
+	if c.agentTokenFile != "" {
+		b, err := os.ReadFile(c.agentTokenFile)
+		if err != nil {
+			return fmt.Errorf("reading agent token: %w", err)
+		}
+		agentToken = strings.TrimSpace(string(b))
+	}
+	var flowStore *flows.Store
+	if agentToken != "" {
+		flowStore = flows.NewStore(0, c.flowRetention)
+		logger.Info("observed-traffic collection enabled", "retention", c.flowRetention)
+	}
+
 	metrics := api.NewMetrics(store)
 	srv := api.NewServer(api.Options{
 		Store: store, Clientset: clientset, CNI: cniResult, K8sVersion: serverVersion,
 		ReadOnly: c.readOnly, Auth: authn, Audit: auditLog,
 		Logger: logger, Metrics: metrics,
+		Flows: flowStore, AgentToken: agentToken,
 	})
 
 	r := chi.NewRouter()
@@ -343,4 +370,58 @@ func loadClusterSnapshot(ctx context.Context, kubeconfig string) (*simulator.Sna
 		return nil, err
 	}
 	return kube.LoadSnapshot(ctx, cs)
+}
+
+// runAgent is `k8s-firewall-ui agent`: the per-node conntrack collector.
+func runAgent(args []string) int {
+	fs := flag.NewFlagSet("agent", flag.ExitOnError)
+	server := fs.String("server", "", "k8s-firewall-ui server URL, e.g. http://firewall-ui.k8s-firewall-ui:8080")
+	token := fs.String("token", "", "agent token (prefer FWUI_AGENT_TOKEN)")
+	node := fs.String("node", "", "node name (default $NODE_NAME, then hostname)")
+	interval := fs.Duration("interval", 10*time.Second, "collection interval")
+	logFormat := fs.String("log-format", "text", "text | json")
+	caFile := fs.String("ca-file", "", "PEM file with the CA (or self-signed certificate) of an HTTPS server")
+	_ = fs.Parse(args)
+	if err := applyEnv(fs); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	if *token == "" {
+		*token = os.Getenv("FWUI_AGENT_TOKEN") // same variable as the server
+	}
+	if *node == "" {
+		*node = os.Getenv("NODE_NAME")
+	}
+	if *node == "" {
+		*node, _ = os.Hostname()
+	}
+	if *server == "" || *token == "" {
+		fmt.Fprintln(os.Stderr, "agent: --server and a token (--token or FWUI_AGENT_TOKEN) are required")
+		return 2
+	}
+	logger := newLogger(*logFormat, "info")
+	client := &http.Client{Timeout: 10 * time.Second}
+	if *caFile != "" {
+		pem, err := os.ReadFile(*caFile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "agent:", err)
+			return 2
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			fmt.Fprintln(os.Stderr, "agent: no certificates in", *caFile)
+			return 2
+		}
+		client.Transport = &http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	logger.Info("flow agent started", "node", *node, "server", *server, "interval", *interval)
+	if err := flows.RunAgent(ctx, flows.AgentConfig{
+		Server: strings.TrimRight(*server, "/"), Token: *token, Node: *node, Interval: *interval, Logger: logger, Client: client,
+	}); err != nil {
+		logger.Error("agent stopped", "error", err)
+		return 1
+	}
+	return 0
 }

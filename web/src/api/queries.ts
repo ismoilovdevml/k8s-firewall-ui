@@ -11,7 +11,7 @@ import type {
   ImportResponse,
   NamespaceInfo,
   NamespaceTopology,
-  PlanRequest,
+  ObservedView,
   Permissions,
   PodInfo,
   PodIsolation,
@@ -256,6 +256,17 @@ export function useNamespaceTopology(enabled: boolean) {
 
 // ---- firewall console ----
 
+export function useFlows(namespace: string, workload: string) {
+  const params = new URLSearchParams({ namespace })
+  if (workload) params.set('workload', workload)
+  return useQuery({
+    queryKey: ['access', 'flows', namespace, workload],
+    queryFn: () => apiGet<ObservedView>(`/api/v1/flows?${params}`),
+    enabled: namespace !== '',
+    refetchInterval: 15_000, // agents report every ~10s
+  })
+}
+
 export function useAccess(namespace: string, workload: string) {
   const params = new URLSearchParams({ namespace })
   if (workload) params.set('workload', workload)
@@ -267,17 +278,19 @@ export function useAccess(namespace: string, workload: string) {
   })
 }
 
-export function usePlanAccess() {
+/** Plan endpoints: '/api/v1/access' (allow/block) or '/api/v1/flows/learn'. */
+export type PlanEndpoint = '/api/v1/access' | '/api/v1/flows/learn'
+
+export function usePlanAccess(endpoint: PlanEndpoint = '/api/v1/access') {
   return useMutation({
-    mutationFn: (req: PlanRequest) => apiSend<AccessPlan>('POST', '/api/v1/access/plan', req),
+    mutationFn: (req: object) => apiSend<AccessPlan>('POST', `${endpoint}/plan`, req),
   })
 }
 
-export function useApplyAccess() {
+export function useApplyAccess(endpoint: PlanEndpoint = '/api/v1/access') {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (req: PlanRequest & { signature: string }) =>
-      apiSend<ApplyResponse>('POST', '/api/v1/access/apply', req),
+    mutationFn: (req: object & { signature: string }) => apiSend<ApplyResponse>('POST', `${endpoint}/apply`, req),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['access'] })
       void qc.invalidateQueries({ queryKey: ['networkpolicies'] })

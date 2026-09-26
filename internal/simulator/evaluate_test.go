@@ -356,3 +356,26 @@ func TestEvaluateErrors(t *testing.T) {
 		t.Fatal("want error: source must be a pod in v0.1")
 	}
 }
+
+func TestIngressFromIP(t *testing.T) {
+	allowOffice := ingressPolicy("b", "office", map[string]string{"app": "db"},
+		networkingv1.NetworkPolicyIngressRule{From: []networkingv1.NetworkPolicyPeer{{IPBlock: &networkingv1.IPBlock{CIDR: "198.51.100.0/24"}}}})
+	cases := []struct {
+		name string
+		pols []*networkingv1.NetworkPolicy
+		ip   string
+		want bool
+	}{
+		{"not isolated", nil, "203.0.113.1", true},
+		{"inside the allowed block", []*networkingv1.NetworkPolicy{allowOffice}, "198.51.100.9", true},
+		{"outside the allowed block", []*networkingv1.NetworkPolicy{allowOffice}, "203.0.113.1", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := IngressFromIP(snap(tc.pols...), tc.ip, podEP("b", "db-1"), tcp(5432))
+			if err != nil || res.Allowed != tc.want {
+				t.Fatalf("allowed = %v (%v), want %v", res.Allowed, err, tc.want)
+			}
+		})
+	}
+}

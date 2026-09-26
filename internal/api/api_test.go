@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -23,6 +24,7 @@ import (
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/auth"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/cni"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/demo"
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/flows"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/kube"
 )
 
@@ -45,6 +47,7 @@ func denyAll(ns string) *networkingv1.NetworkPolicy {
 }
 
 type harness struct {
+	snap   *kube.ClusterSnapshot
 	t      *testing.T
 	router http.Handler
 	cs     *fake.Clientset
@@ -81,7 +84,7 @@ func newHarness(t *testing.T, readOnly bool, authn *auth.Authenticator, pols ...
 	r := chi.NewRouter()
 	r.Use(SecurityHeaders(false))
 	srv.Routes(r)
-	return &harness{t: t, router: r, cs: cs, audit: log}
+	return &harness{snap: snap, t: t, router: r, cs: cs, audit: log}
 }
 
 func (h *harness) do(method, path, body string, headers ...string) *httptest.ResponseRecorder {
@@ -485,5 +488,54 @@ func TestAccessPlanAndApply(t *testing.T) {
 	ro := newHarness(t, true, nil, denyAll("b"))
 	if w := ro.do(http.MethodPost, "/api/v1/access/apply", signed); w.Code != http.StatusForbidden {
 		t.Fatalf("read-only apply status %d", w.Code)
+	}
+}
+
+func TestObservedFlowsAndLearning(t *testing.T) {
+	h := newHarness(t, false, nil)
+	// Rebuild the server with flow collection enabled.
+	store := flows.NewStore(0, time.Hour)
+	srv := NewServer(Options{
+		Store: &fakeStore{snap: h.snap}, Clientset: h.cs, CNI: cni.Result{Provider: "calico", EnforcesPolicies: true},
+		Audit: h.audit, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Flows: store, AgentToken: "s3cret",
+	})
+	t.Cleanup(srv.Close)
+	r := chi.NewRouter()
+	srv.Routes(r)
+	h.router = r
+
+	report := `{"node":"n1","flows":[
+	  {"protocol":"TCP","src":"10.0.0.1","dst":"10.0.0.2","dstPort":5432},
+	  {"protocol":"TCP","src":"10.0.0.1","dst":"93.184.216.34","dstPort":443},
+	  {"protocol":"TCP","src":"192.168.9.9","dst":"192.168.9.10","dstPort":22}]}`
+	if w := h.do(http.MethodPost, "/api/v1/flows/ingest", report, "Authorization", "Bearer wrong"); w.Code != http.StatusUnauthorized {
+		t.Fatalf("bad token status %d", w.Code)
+	}
+	w := h.do(http.MethodPost, "/api/v1/flows/ingest", report, "Authorization", "Bearer s3cret")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"accepted":2`) {
+		t.Fatalf("ingest = %d %s (host-only flow must be dropped)", w.Code, w.Body)
+	}
+
+	w = h.do(http.MethodGet, "/api/v1/flows?namespace=a&workload=deployment/web", "")
+	var view struct {
+		Outbound []struct {
+			Peer       struct{ Kind, Namespace, Workload, CIDR string }
+			AllowedNow bool
+			Ports      []struct{ Port int }
+		}
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &view); err != nil || len(view.Outbound) != 2 {
+		t.Fatalf("flows = %d %s", w.Code, w.Body)
+	}
+	for _, row := range view.Outbound {
+		if !row.AllowedNow {
+			t.Errorf("nothing is isolated, so %+v must be allowed now", row.Peer)
+		}
+	}
+
+	w = h.do(http.MethodPost, "/api/v1/flows/learn/plan", `{"subject":{"namespace":"a","workload":"deployment/web"},"direction":"outbound"}`)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "fwui-web-egress") ||
+		!strings.Contains(w.Body.String(), "93.184.216.34/32") || !strings.Contains(w.Body.String(), `"verified":true`) {
+		t.Fatalf("learn plan = %d %s", w.Code, w.Body)
 	}
 }

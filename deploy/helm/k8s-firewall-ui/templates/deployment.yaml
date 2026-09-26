@@ -69,6 +69,9 @@ spec:
             - --tls-cert-file=/etc/k8s-firewall-ui/tls/tls.crt
             - --tls-key-file=/etc/k8s-firewall-ui/tls/tls.key
             {{- end }}
+            {{- if .Values.flows.enabled }}
+            - --flow-retention={{ .Values.flows.retention }}
+            {{- end }}
             {{- if .Values.notifications.enabled }}
             - --notify-format={{ .Values.notifications.format }}
             {{- end }}
@@ -89,6 +92,13 @@ spec:
                 secretKeyRef:
                   name: {{ required "notifications.existingSecret is required when notifications.enabled" .Values.notifications.existingSecret }}
                   key: {{ .Values.notifications.existingSecretKey }}
+            {{- end }}
+            {{- if .Values.flows.enabled }}
+            - name: FWUI_AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "k8s-firewall-ui.agentSecretName" . }}
+                  key: {{ .Values.flows.existingSecretKey }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

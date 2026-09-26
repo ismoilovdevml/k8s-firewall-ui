@@ -22,9 +22,15 @@ make build >/dev/null
 export FWUI_TOKEN=$($KUBECTL -n fwui-e2e create token editor --duration=1h)
 export FWUI_VIEWER_TOKEN=$($KUBECTL -n fwui-e2e create token viewer --duration=1h)
 export FWUI_TENANT_TOKEN=$($KUBECTL -n fwui-e2e create token shop-team --duration=1h)
-./bin/k8s-firewall-ui --listen ":$PORT" --auth-mode token --restrict-reads --session-secret e2e-secret > e2e-server.log 2>&1 &
+./bin/k8s-firewall-ui --listen ":$PORT" --auth-mode token --restrict-reads --session-secret e2e-secret \
+  --agent-token e2e-agent > e2e-server.log 2>&1 &
 SERVER=$!
-trap 'kill $SERVER 2>/dev/null || true' EXIT
 for _ in $(seq 1 60); do curl -sf "localhost:$PORT/readyz" >/dev/null && break; sleep 1; done
+# The flow agent reads this node's conntrack table (needs CAP_NET_ADMIN:
+# run as root, or set AGENT_SUDO=sudo).
+${AGENT_SUDO:-} ./bin/k8s-firewall-ui agent --server "http://localhost:$PORT" --token e2e-agent \
+  --interval 2s --node e2e-node > e2e-agent.log 2>&1 &
+AGENT=$!
+trap 'kill $SERVER 2>/dev/null || true; ${AGENT_SUDO:-} kill $AGENT 2>/dev/null || true' EXIT
 export KUBECTL
 cd web && FWUI_URL="http://localhost:$PORT" npx playwright test "$@"

@@ -4,6 +4,7 @@ import { errorMessage } from '../api/client'
 import { useAccess, useNamespacePods, useNamespaces } from '../api/queries'
 import type { AccessReport, AccessRow, FlowDirection, PlanRequest } from '../api/types'
 import PlanDialog from '../components/firewall/PlanDialog'
+import ObservedCard from '../components/firewall/ObservedCard'
 import { deniedBy, peerId, rowStatus } from '../components/firewall/flow'
 import { Badge, Button, Card, PageHeader, Spinner } from '../components/ui'
 
@@ -24,6 +25,7 @@ export default function FirewallPage() {
   const { data: pods } = useNamespacePods(namespace)
   const access = useAccess(namespace, workload)
   const [plan, setPlan] = useState<PlanRequest | null>(null)
+  const [learn, setLearn] = useState<FlowDirection | null>(null)
 
   const workloads = useMemo(() => {
     const byOwner = new Map<string, number>()
@@ -115,9 +117,18 @@ export default function FirewallPage() {
       )}
       {access.isLoading && namespace && <Spinner />}
       {access.error && <p className="text-sm text-block">{errorMessage(access.error)}</p>}
+      {access.data && (
+        <ObservedCard subject={{ namespace, workload: workload || undefined }} onLearn={(d) => setLearn(d)} />
+      )}
       {access.data && <Report report={access.data} onRequest={request} onOpenWorkload={(wl) => pick(namespace, wl)} />}
 
       {plan && <PlanDialog request={plan} onClose={() => setPlan(null)} />}
+      {learn && (
+        <PlanDialog
+          learn={{ subject: { namespace, workload: workload || undefined }, direction: learn }}
+          onClose={() => setLearn(null)}
+        />
+      )}
     </div>
   )
 }

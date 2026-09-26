@@ -97,6 +97,16 @@ Response: `{selectedWorkloads, newlyBlocked: [{source, target, before, after}], 
 
 `POST /api/v1/access/apply` with the same body plus the reviewed `signature`. The server recomputes the plan, answers 409 `PLAN_CHANGED` if it differs, dry-runs every change, then applies them as the user (audited). Managed policies carry `app.kubernetes.io/managed-by: k8s-firewall-ui` and are named `fwui-<workload>-ingress|egress` or `fwui-namespace-ingress|egress`.
 
+## Observed traffic
+
+Enabled when the server runs with `--agent-token` (Helm `flows.enabled=true`). Flows are kept in memory for `--flow-retention` (default 24h).
+
+`POST /api/v1/flows/ingest` (agents only, `Authorization: Bearer <agent token>`) with `{node, flows: [{protocol, src, dst, dstPort, serviceIP?, servicePort?}]}` → `{accepted}`. `dst` is the real destination after DNAT, so Service traffic resolves to the backend pod. Flows that touch no pod are dropped.
+
+`GET /api/v1/flows?namespace=ns[&workload=deployment/web]` → `{enabled, agents: {node: lastUpload}, subject, outbound: [row], inbound: [row]}`. A row is `{peer, allowedNow, lastSeen, ports: [{protocol, port, allowedNow, lastSeen, samples, serviceIP?}]}`; `allowedNow` is the verdict of the current policies for that observed connection.
+
+`POST /api/v1/flows/learn/plan` with `{subject, direction: inbound|outbound}` → a plan (same shape as `/access/plan`) that allows exactly the observed peers and ports for that direction (plus DNS for outbound) and isolates the rest. `POST /api/v1/flows/learn/apply` with the same body plus the reviewed `signature` applies it like `/access/apply`.
+
 ## Posture
 
 `GET /api/v1/posture` → `{summary, namespaces, findings}`.

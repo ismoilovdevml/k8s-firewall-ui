@@ -304,3 +304,27 @@ export interface ApplyResponse {
   plan: AccessPlan
   results: { namespace: string; name: string; operation: string; error?: string }[]
 }
+
+export interface ObservedPort {
+  protocol: string
+  port: number
+  allowedNow: boolean
+  lastSeen: string
+  samples: number
+  serviceIP?: string
+}
+
+export interface ObservedRow {
+  peer: AccessPeer
+  ports: ObservedPort[]
+  lastSeen: string
+  allowedNow: boolean
+}
+
+export interface ObservedView {
+  enabled: boolean
+  agents: Record<string, string>
+  subject: AccessSubject
+  outbound: ObservedRow[]
+  inbound: ObservedRow[]
+}

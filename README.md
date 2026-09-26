@@ -18,6 +18,10 @@
 
   ![Firewall console](docs/screenshots/firewall.png)
 
+- 👀 **Observed traffic and learning mode**: an optional node agent (`flows.enabled=true`) reads each node's conntrack table and reports the connections pods actually make: peer pod or external IP, port, protocol, Service, and when it was last seen. Each flow shows whether current policies allow it. **Allow only observed outbound/inbound** turns that into a least-privilege policy (DNS kept), verified by the simulator and reviewed as a diff before it is applied.
+
+  ![Observed traffic](docs/screenshots/observed.png)
+
 - 🗺️ **Topology viewer**: a namespace-level map of the whole cluster (fully open, partially open, blocked, unrestricted between every pair of teams) that drills down into a live workload graph. Green means allowed by policy, red means blocked, dotted means no policy applies. Filter by verdict, and click an edge to see which policies decide it.
 
   ![Topology](docs/screenshots/topology-namespaces.png)

@@ -17,6 +17,12 @@ spec:
       {{- with .Values.networkPolicy.ingressFrom }}
       from:
         {{- toYaml . | nindent 8 }}
+        {{- if $.Values.flows.enabled }}
+        {{- range $.Values.networkPolicy.agentCIDRs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+        {{- end }}
       {{- end }}
   egress:
     # DNS

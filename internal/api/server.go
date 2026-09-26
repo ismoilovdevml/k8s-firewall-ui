@@ -12,6 +12,7 @@ import (
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/audit"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/auth"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/cni"
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/flows"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/kube"
 )
 
@@ -35,6 +36,10 @@ type Options struct {
 	Audit      *audit.Log
 	Logger     *slog.Logger
 	Metrics    *Metrics
+	// Flows enables observed-traffic features; AgentToken authenticates
+	// node agents posting to /api/v1/flows/ingest.
+	Flows      *flows.Store
+	AgentToken string
 }
 
 // Server wires the informer store, kubernetes client, and SSE hub.
@@ -50,6 +55,8 @@ type Server struct {
 	metrics    *Metrics
 	hub        *sseHub
 	cache      *resultCache
+	flows      *flows.Store
+	agentToken string
 }
 
 // NewServer constructs the API server; the SSE hub goroutine starts
@@ -83,6 +90,8 @@ func NewServer(o Options) *Server {
 		metrics:    o.Metrics,
 		hub:        newSSEHub(o.Metrics),
 		cache:      o.Metrics.cache,
+		flows:      o.Flows,
+		agentToken: o.AgentToken,
 	}
 	go s.hub.run(o.Store.Events())
 	return s
@@ -123,6 +132,8 @@ func (s *Server) Routes(r chi.Router) {
 		r.Get("/auth/me", s.auth.HandleMe)
 		r.Post("/auth/login", s.auth.HandleLogin)
 		r.Post("/auth/logout", s.auth.HandleLogout)
+		// Node agents authenticate with the agent token, not a user session.
+		r.Post("/flows/ingest", s.handleFlowIngest)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.auth.Require)
@@ -142,10 +153,13 @@ func (s *Server) Routes(r chi.Router) {
 				r.Delete("/namespaces/{ns}/networkpolicies/{name}", s.handlePolicyDelete)
 				r.Post("/networkpolicies/import", s.handleImport)
 				r.Post("/access/apply", s.handleAccessApply)
+				r.Post("/flows/learn/apply", s.handleLearnApply)
 			})
 			r.Post("/simulate", s.handleSimulate)
 			r.Post("/impact", s.handleImpact)
 			r.Get("/access", s.handleAccess)
+			r.Get("/flows", s.handleFlows)
+			r.Post("/flows/learn/plan", s.handleLearnPlan)
 			r.Post("/access/plan", s.handleAccessPlan)
 			r.Get("/posture", s.handlePosture)
 			r.Get("/posture/report", s.handlePostureReport)
