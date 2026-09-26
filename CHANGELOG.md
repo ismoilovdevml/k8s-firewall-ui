@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- **Observed traffic and learning mode**: a node agent (`k8s-firewall-ui agent`, Helm `flows.enabled=true`) reports the connections pods actually make from conntrack (Service traffic resolved to the backend pod). The Firewall page shows them per namespace/workload with the current verdict of each, and "Allow only observed outbound/inbound" builds a simulator-verified least-privilege policy from them. Covered by an end-to-end test against real traffic.
+- **Observed traffic and learning mode**: a node agent (`k8s-firewall-ui agent`, Helm `flows.enabled=true`) reports the connections pods actually make from conntrack (Service traffic resolved to the backend pod). The Firewall page shows them per namespace/workload with the current verdict of each, and "Allow only observed outbound/inbound" builds a simulator-verified least-privilege policy from them. Covered by an end-to-end test against real traffic; `--demo` includes synthetic observed traffic.
 
 ## v0.2.0 — enterprise release
 

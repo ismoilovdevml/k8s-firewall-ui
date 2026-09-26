@@ -93,6 +93,7 @@ jobs:
           curl -sf localhost:8080/api/v1/posture | grep -q '"score"'
           curl -sf localhost:8080/ | grep -q '<div id="root">'
           curl -sf localhost:8080/metrics | grep -q fwui_posture_score
+          curl -sf 'localhost:8080/api/v1/flows?namespace=shop&workload=deployment/frontend' | grep -q '"allowedNow":true'
           # writes without the CSRF header are rejected
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8080/api/v1/simulate -d '{}')" = 403
 

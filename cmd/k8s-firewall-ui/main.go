@@ -253,6 +253,12 @@ func run(ctx context.Context, c config, logger *slog.Logger) error {
 		flowStore = flows.NewStore(0, c.flowRetention)
 		logger.Info("observed-traffic collection enabled", "retention", c.flowRetention)
 	}
+	if c.demo && flowStore == nil {
+		flowStore = flows.NewStore(0, c.flowRetention)
+		if err := demo.FeedFlows(ctx, clientset, flowStore, 15*time.Second); err != nil {
+			return fmt.Errorf("demo flows: %w", err)
+		}
+	}
 
 	metrics := api.NewMetrics(store)
 	srv := api.NewServer(api.Options{
