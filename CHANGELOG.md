@@ -4,6 +4,7 @@
 
 ### Added
 - **Firewall console**: per namespace, workload or pod, every inbound and outbound peer (workloads, namespaces, DNS, external CIDRs, the internet) with per-port status, the denying side and the deciding rule; one-click **Allow / Block** through a planner that writes managed least-privilege policies, keeps other current connections when it has to isolate a side, reports hand-written rules it cannot change, verifies the result with the simulator, and applies after a diff + impact review (server re-plans and refuses stale plans). Verified end-to-end against real traffic.
+- **`lint` command** for CI/GitOps: offline checks of NetworkPolicy manifests (invalid peers/CIDRs, duplicates, implicit policyTypes, allow-all rules, `0.0.0.0/0`, DNS trap), `--cluster` overlay reporting only newly introduced findings plus connection impact, `text`/`json`/`github` output and `--fail-on` exit codes.
 - **Security overview**: posture score, ingress/egress isolation coverage per namespace with pod drill-down, and prioritized findings: DNS broken by egress isolation, selectors with label typos that match nothing, policies selecting no pods, allow-all rules, `0.0.0.0/0` ingress, unprotected namespaces, hostNetwork pods. One-click "Harden" creates a default-deny baseline.
 - **Impact preview**: before creating, editing, deleting or drawing a policy, see which workload connections become blocked or allowed.
 - **Review diff**: the Edit and YAML tabs show a unified diff of the pending change before you apply it.

@@ -26,7 +26,9 @@ import (
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/cni"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/demo"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/kube"
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/lint"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/notify"
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/simulator"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/version"
 	"github.com/ismoilovdevml/k8s-firewall-ui/web"
 )
@@ -56,6 +58,9 @@ type config struct {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "lint" {
+		os.Exit(lint.Main(os.Args[2:], os.Stdin, os.Stdout, os.Stderr, loadClusterSnapshot))
+	}
 	var c config
 	flags := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	flags.StringVar(&c.listen, "listen", ":8080", "address to listen on")
@@ -330,3 +335,12 @@ const placeholderHTML = `<!doctype html>
 <pre>make web &amp;&amp; make backend</pre>
 </body>
 </html>`
+
+// loadClusterSnapshot backs `lint --cluster`.
+func loadClusterSnapshot(ctx context.Context, kubeconfig string) (*simulator.Snapshot, error) {
+	cs, _, err := kube.NewClientset(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	return kube.LoadSnapshot(ctx, cs)
+}

@@ -35,6 +35,7 @@ Browser (React SPA) ── REST /api/v1 + SSE /api/v1/events ──▶ Go binary
 | `internal/audit` | mutation audit: slog line + in-memory ring for the UI |
 | `internal/demo` | in-memory sample cluster for `--demo` (fake clientset) |
 | `internal/simulator` | **pure** policy evaluation engine over `ClusterSnapshot` — MUST NOT import client-go or make API calls. Also `Analyze` (posture findings/score) and `Impact` (what-if diff) |
+| `internal/lint` | `k8s-firewall-ui lint`: offline manifest checks + `--cluster` overlay (new findings, impact); text/json/github output |
 | `internal/cni` | heuristic CNI detection (kube-system DaemonSets + CRD discovery), `--cni-override` escape hatch |
 
 Frontend (`web/src/`): `api/` (fetch client, query keys, sse), `pages/` (Overview, Topology, Policies, PolicyDetail, PolicyNew, Simulator, Builder, Audit, Login), `components/` (`ui.tsx` primitives, AuthGate, ImpactPanel, ImportDialog), `policy/` (draft model, templates, diff), `hooks/useSSEInvalidation.ts`. State: TanStack Query + SSE invalidation; zustand only for the builder canvas.

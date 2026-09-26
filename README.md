@@ -36,6 +36,7 @@
 
   ![Builder](docs/screenshots/builder.png)
 
+- ✅ **Policy linting for CI/GitOps**: `k8s-firewall-ui lint` catches invalid and risky manifests in pull requests, with GitHub annotations. `--cluster` overlays the PR on the live cluster and reports the findings it introduces (for example label typos) plus every connection it blocks or opens. See [docs/lint.md](docs/lint.md).
 - 📦 **GitOps-friendly import/export**: export clean, re-appliable multi-document YAML; import YAML from another cluster or a repo with a mandatory dry-run first (created / updated / unchanged per policy).
 - 🔐 **Enterprise access control**: sign in with a Kubernetes token or through your SSO proxy (oauth2-proxy, Pomerium). Writes run as the signed-in user, so Kubernetes RBAC decides who may change which namespace. The UI disables actions you are not allowed to perform.
 - 🧾 **Audit log**: every change is recorded with user, source IP, result, and a before/after YAML diff, as structured logs and on an in-app audit page.

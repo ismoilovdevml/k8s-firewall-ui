@@ -9,6 +9,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -156,6 +157,39 @@ func (s *Store) Snapshot() (*ClusterSnapshot, error) {
 		a, b := snap.Policies[i], snap.Policies[j]
 		return a.Namespace+"/"+a.Name < b.Namespace+"/"+b.Name
 	})
+	snap.IndexNamespaces()
+	return snap, nil
+}
+
+// LoadSnapshot lists pods, namespaces and NetworkPolicies once, without
+// informers — for one-shot tools such as `k8s-firewall-ui lint --cluster`.
+func LoadSnapshot(ctx context.Context, cs kubernetes.Interface) (*ClusterSnapshot, error) {
+	pods, err := cs.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("listing pods: %w", err)
+	}
+	nss, err := cs.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("listing namespaces: %w", err)
+	}
+	pols, err := cs.NetworkingV1().NetworkPolicies("").List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("listing networkpolicies: %w", err)
+	}
+	snap := &ClusterSnapshot{}
+	for i := range pods.Items {
+		p := &pods.Items[i]
+		if p.Status.Phase == corev1.PodSucceeded || p.Status.Phase == corev1.PodFailed {
+			continue
+		}
+		snap.Pods = append(snap.Pods, podInfoFrom(p))
+	}
+	for _, ns := range nss.Items {
+		snap.Namespaces = append(snap.Namespaces, NamespaceInfo{Name: ns.Name, Labels: ns.Labels})
+	}
+	for i := range pols.Items {
+		snap.Policies = append(snap.Policies, &pols.Items[i])
+	}
 	snap.IndexNamespaces()
 	return snap, nil
 }

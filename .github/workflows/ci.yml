@@ -16,7 +16,9 @@ jobs:
       - name: Test
         run: go test ./... -race -cover
       - name: Vet
-        run: go vet ./...
+        run: go vet ./... && go vet -tags e2e ./test/e2e/
+      - name: Lint the sample policies with our own linter
+        run: go run ./cmd/k8s-firewall-ui lint --format github --fail-on critical hack/e2e/
       - name: Lint
         uses: golangci/golangci-lint-action@v8
         with:
