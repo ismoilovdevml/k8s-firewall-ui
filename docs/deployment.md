@@ -220,9 +220,14 @@ current policies allow it, and can build a least-privilege policy from it.
   bypass conntrack report nothing.
 - Only established connections are recorded: packets a policy drops never
   show up, so observe *before* locking a workload down.
-- Flows live in the server's memory (`flows.retention`) and restart empty.
-  Agents resolve a headless Service (`<fullname>-replicas`) and upload to
-  every replica, so all replicas show the same traffic.
+- Flows live in the server's memory for `flows.retention`. Agents resolve a
+  headless Service (`<fullname>-replicas`) and upload to every replica, so
+  all replicas show the same traffic.
+- Without persistence a restarted server starts empty and relearns from the
+  agents. `flows.persistence.enabled=true` keeps flows on a PVC (written
+  every minute and on shutdown, restored on start; single replica, the
+  Deployment switches to the `Recreate` strategy). The PVC is kept when the
+  release is uninstalled.
 - With `tls.enabled`, agents trust `tls.secretName`'s `flows.agent.caKey`
   and verify the certificate for `<fullname>.<namespace>.svc`.
   With `networkPolicy.ingressFrom` set, add the node CIDRs to
@@ -267,6 +272,8 @@ Every flag can also be set as an environment variable `FWUI_<FLAG>` (dashes beco
 | `--notify-format` | `json` | `json` (audit entry) \| `slack` (text) |
 | `--agent-token`, `--agent-token-file` | | enable flow ingestion from node agents (use `FWUI_AGENT_TOKEN`) |
 | `--flow-retention` | `24h` | how long observed flows are kept |
+| `--flow-state-file` | | keep observed flows across restarts in this file |
+| `--flow-save-interval` | `1m` | how often `--flow-state-file` is written |
 | `--log-format` | `text` | `text` \| `json` |
 | `--log-level` | `info` | `debug` \| `info` \| `warn` \| `error` |
 | `--shutdown-timeout` | `15s` | graceful shutdown timeout |

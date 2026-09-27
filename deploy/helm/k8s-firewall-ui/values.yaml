@@ -91,6 +91,13 @@ flows:
   agentToken: ""
   existingSecret: ""
   existingSecretKey: agent-token
+  # Keep observed flows across server restarts on a PersistentVolumeClaim
+  # (saved every minute and on shutdown). Needs replicaCount=1.
+  persistence:
+    enabled: false
+    size: 1Gi
+    storageClass: ""
+    existingClaim: ""
   agent:
     interval: 10s
     # Default: upload to every server replica through a headless Service.

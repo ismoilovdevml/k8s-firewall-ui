@@ -1,0 +1,19 @@
+{{- if and .Values.flows.enabled .Values.flows.persistence.enabled (not .Values.flows.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "k8s-firewall-ui.fullname" . }}-flows
+  labels:
+    {{- include "k8s-firewall-ui.labels" . | nindent 4 }}
+  annotations:
+    # Keep observed traffic when the release is uninstalled and reinstalled.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.flows.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.flows.persistence.size }}
+{{- end }}

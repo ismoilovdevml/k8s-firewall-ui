@@ -113,3 +113,38 @@ func TestAgentFanoutReachesEveryReplica(t *testing.T) {
 		t.Fatalf("hits = %s, %s", first, second)
 	}
 }
+
+func TestStoreSurvivesRestart(t *testing.T) {
+	path := t.TempDir() + "/flows.json.gz"
+	now := time.Now()
+	s := NewStore(0, time.Hour)
+	s.now = func() time.Time { return now.Add(-2 * time.Hour) }
+	s.Ingest(Report{Node: "old", Flows: []Flow{{Protocol: "TCP", Src: "10.0.0.9", Dst: "10.0.0.2", DstPort: 22}}})
+	s.now = func() time.Time { return now }
+	s.Ingest(Report{Node: "n1", Flows: []Flow{{Protocol: "TCP", Src: "10.0.0.1", Dst: "10.0.0.2", DstPort: 80, ServiceIP: "10.96.0.5", ServicePort: 80}}})
+	if err := s.SaveFile(path); err != nil {
+		t.Fatal(err)
+	}
+
+	restored := NewStore(0, time.Hour)
+	n, err := restored.LoadFile(path)
+	if err != nil || n != 1 {
+		t.Fatalf("restored %d flows, err %v", n, err)
+	}
+	got := restored.All()[0]
+	if got.ServiceIP != "10.96.0.5" || got.Samples != 1 || got.Nodes[0] != "n1" || len(restored.Agents()) != 1 {
+		t.Fatalf("restored %+v, agents %v", got, restored.Agents())
+	}
+
+	if n, err := NewStore(0, time.Hour).LoadFile(path + ".missing"); n != 0 || err != nil {
+		t.Fatalf("missing file: %d, %v", n, err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := restored.Persist(ctx, path+".2", time.Hour, slog.Default())
+	cancel()
+	<-done
+	if n, err := NewStore(0, time.Hour).LoadFile(path + ".2"); n != 1 || err != nil {
+		t.Fatalf("final save on shutdown: %d, %v", n, err)
+	}
+}

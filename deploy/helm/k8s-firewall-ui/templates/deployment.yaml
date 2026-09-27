@@ -1,3 +1,7 @@
+{{- $persist := and .Values.flows.enabled .Values.flows.persistence.enabled }}
+{{- if and $persist (gt (int .Values.replicaCount) 1) }}
+{{- fail "flows.persistence needs replicaCount=1 (the volume is ReadWriteOnce)" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,6 +10,11 @@ metadata:
     {{- include "k8s-firewall-ui.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  {{- if $persist }}
+  # The flow volume is ReadWriteOnce: never run two pods at once.
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "k8s-firewall-ui.selectorLabels" . | nindent 6 }}
@@ -72,6 +81,9 @@ spec:
             {{- if .Values.flows.enabled }}
             - --flow-retention={{ .Values.flows.retention }}
             {{- end }}
+            {{- if $persist }}
+            - --flow-state-file=/var/lib/k8s-firewall-ui/flows.json.gz
+            {{- end }}
             {{- if .Values.notifications.enabled }}
             - --notify-format={{ .Values.notifications.format }}
             {{- end }}
@@ -133,17 +145,30 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.tls.enabled }}
+          {{- if or .Values.tls.enabled $persist }}
           volumeMounts:
+            {{- if .Values.tls.enabled }}
             - name: tls
               mountPath: /etc/k8s-firewall-ui/tls
               readOnly: true
+            {{- end }}
+            {{- if $persist }}
+            - name: flows
+              mountPath: /var/lib/k8s-firewall-ui
+            {{- end }}
           {{- end }}
-      {{- if .Values.tls.enabled }}
+      {{- if or .Values.tls.enabled $persist }}
       volumes:
+        {{- if .Values.tls.enabled }}
         - name: tls
           secret:
             secretName: {{ required "tls.secretName is required when tls.enabled" .Values.tls.secretName }}
+        {{- end }}
+        {{- if $persist }}
+        - name: flows
+          persistentVolumeClaim:
+            claimName: {{ .Values.flows.persistence.existingClaim | default (printf "%s-flows" (include "k8s-firewall-ui.fullname" .)) }}
+        {{- end }}
       {{- end }}
       terminationGracePeriodSeconds: 30
       {{- with .Values.nodeSelector }}

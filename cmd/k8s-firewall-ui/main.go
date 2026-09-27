@@ -62,6 +62,8 @@ type config struct {
 	agentToken        string
 	agentTokenFile    string
 	flowRetention     time.Duration
+	flowStateFile     string
+	flowSaveInterval  time.Duration
 }
 
 func main() {
@@ -96,6 +98,8 @@ func main() {
 	flags.StringVar(&c.agentToken, "agent-token", "", "enable observed-traffic collection; node agents authenticate with this token (prefer FWUI_AGENT_TOKEN or --agent-token-file)")
 	flags.StringVar(&c.agentTokenFile, "agent-token-file", "", "file containing the agent token")
 	flags.DurationVar(&c.flowRetention, "flow-retention", 24*time.Hour, "how long observed flows are kept")
+	flags.StringVar(&c.flowStateFile, "flow-state-file", "", "keep observed flows across restarts in this file (e.g. on a persistent volume)")
+	flags.DurationVar(&c.flowSaveInterval, "flow-save-interval", time.Minute, "how often observed flows are written to --flow-state-file")
 	flags.BoolVar(&c.restrictReads, "restrict-reads", false, "token/proxy mode: show each user only namespaces where they may list NetworkPolicies")
 	flags.BoolVar(&c.demo, "demo", false, "run against a built-in in-memory sample cluster (no Kubernetes needed)")
 	showVersion := flags.Bool("version", false, "print version and exit")
@@ -254,6 +258,21 @@ func run(ctx context.Context, c config, logger *slog.Logger) error {
 		flowStore = flows.NewStore(0, c.flowRetention)
 		logger.Info("observed-traffic collection enabled", "retention", c.flowRetention)
 	}
+	var flowsSaved <-chan struct{}
+	if flowStore != nil && c.flowStateFile != "" {
+		n, err := flowStore.LoadFile(c.flowStateFile)
+		if err != nil {
+			// A corrupt file must not keep the server down; start empty.
+			logger.Warn("could not restore observed flows", "path", c.flowStateFile, "error", err)
+		} else {
+			logger.Info("restored observed flows", "path", c.flowStateFile, "flows", n)
+		}
+		flowsSaved = flowStore.Persist(ctx, c.flowStateFile, c.flowSaveInterval, logger)
+	} else {
+		ch := make(chan struct{})
+		close(ch)
+		flowsSaved = ch
+	}
 	if c.demo && flowStore == nil {
 		flowStore = flows.NewStore(0, c.flowRetention)
 		if err := demo.FeedFlows(ctx, clientset, flowStore, 15*time.Second); err != nil {
@@ -318,6 +337,10 @@ func run(ctx context.Context, c config, logger *slog.Logger) error {
 	err = httpServer.Shutdown(shutdownCtx)
 	if webhook != nil {
 		webhook.Close(shutdownCtx) // deliver queued notifications
+	}
+	select { // final save of observed flows
+	case <-flowsSaved:
+	case <-shutdownCtx.Done():
 	}
 	return err
 }

@@ -66,6 +66,7 @@ jobs:
       - run: helm template test deploy/helm/k8s-firewall-ui --set auth.mode=token --set auth.restrictReads=true > /dev/null
       - run: helm template test deploy/helm/k8s-firewall-ui --set auth.mode=proxy --set networkPolicy.enabled=true > /dev/null
       - run: helm template test deploy/helm/k8s-firewall-ui --set flows.enabled=true --set tls.enabled=true --set tls.secretName=tls --set networkPolicy.enabled=true --set replicaCount=2 > /dev/null
+      - run: helm template test deploy/helm/k8s-firewall-ui --set flows.enabled=true --set flows.persistence.enabled=true > /dev/null
       - run: >-
           helm template test deploy/helm/k8s-firewall-ui --set tls.enabled=true --set tls.secretName=tls
           --set metrics.serviceMonitor.enabled=true --set podDisruptionBudget.enabled=true
