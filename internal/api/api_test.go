@@ -495,9 +495,12 @@ func TestObservedFlowsAndLearning(t *testing.T) {
 	h := newHarness(t, false, nil)
 	// Rebuild the server with flow collection enabled.
 	store := flows.NewStore(0, time.Hour)
+	metrics := NewMetrics(nil)
+	metrics.WatchFlows(store)
 	srv := NewServer(Options{
 		Store: &fakeStore{snap: h.snap}, Clientset: h.cs, CNI: cni.Result{Provider: "calico", EnforcesPolicies: true},
 		Audit: h.audit, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Flows: store, AgentToken: "s3cret",
+		Metrics: metrics,
 	})
 	t.Cleanup(srv.Close)
 	r := chi.NewRouter()
@@ -514,6 +517,14 @@ func TestObservedFlowsAndLearning(t *testing.T) {
 	w := h.do(http.MethodPost, "/api/v1/flows/ingest", report, "Authorization", "Bearer s3cret")
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"accepted":2`) {
 		t.Fatalf("ingest = %d %s (host-only flow must be dropped)", w.Code, w.Body)
+	}
+	scrape := httptest.NewRecorder()
+	metrics.Handler().ServeHTTP(scrape, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	for _, want := range []string{`fwui_flows_stored 2`, `fwui_flow_agents 1`, `fwui_flow_agent_last_report_timestamp_seconds{node="n1"}`,
+		`fwui_flow_ingest_total{result="accepted"} 1`, `fwui_flow_ingest_total{result="unauthorized"} 1`} {
+		if !strings.Contains(scrape.Body.String(), want) {
+			t.Errorf("metrics lack %s", want)
+		}
 	}
 
 	w = h.do(http.MethodGet, "/api/v1/flows?namespace=a&workload=deployment/web", "")

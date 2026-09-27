@@ -150,6 +150,13 @@ func (s *Store) All() []Record {
 	return out
 }
 
+// Len is the number of stored flows.
+func (s *Store) Len() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.records)
+}
+
 // Agents reports each node's last upload time.
 func (s *Store) Agents() map[string]time.Time {
 	s.mu.Lock()

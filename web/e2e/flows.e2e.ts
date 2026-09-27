@@ -36,6 +36,7 @@ test('the agent reports real connections with their current verdict', async ({ p
   const row = page.locator('[data-observed="outbound"] tr[data-observed-peer="analytics/deployment/dashboard"]')
   await expect(row).toContainText('✓ 3000/TCP')
   await expect(page.getByText(/node agents? reporting/)).toBeVisible()
+  await expect(page.locator('[data-stale-agents]')).toHaveCount(0)
   await page.screenshot({ path: 'e2e-results/shots/observed.png', fullPage: true })
 })
 

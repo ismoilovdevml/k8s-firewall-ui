@@ -149,6 +149,9 @@ creates a ServiceMonitor):
 | `fwui_policy_mutations_total{action,result}` | changes made through the UI |
 | `fwui_http_requests_total`, `fwui_http_request_duration_seconds` | HTTP traffic |
 | `fwui_informers_synced` | 1 when caches are ready |
+| `fwui_flows_stored`, `fwui_flow_agents` | observed flows and reporting node agents (`flows.enabled`) |
+| `fwui_flow_agent_last_report_timestamp_seconds{node}` | each agent's last upload |
+| `fwui_flow_ingest_total{result}` | agent uploads (accepted / unauthorized / invalid) |
 
 Example alert:
 
@@ -158,6 +161,11 @@ Example alert:
   for: 15m
   annotations:
     summary: "NetworkPolicy posture has critical findings (e.g. egress isolation that breaks DNS)"
+- alert: FirewallFlowAgentSilent
+  expr: time() - fwui_flow_agent_last_report_timestamp_seconds > 300
+  for: 5m
+  annotations:
+    summary: "Flow agent on {{ $labels.node }} has not reported for 5 minutes"
 ```
 
 ## 6. Audit

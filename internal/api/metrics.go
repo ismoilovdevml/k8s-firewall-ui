@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/ismoilovdevml/k8s-firewall-ui/internal/flows"
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/simulator"
 )
 
@@ -18,6 +19,7 @@ type Metrics struct {
 	latency   *prometheus.HistogramVec
 	mutations *prometheus.CounterVec
 	sse       prometheus.Gauge
+	ingest    *prometheus.CounterVec
 	// cache is shared with the API server so scrapes and page loads reuse
 	// the same posture analysis.
 	cache *resultCache
@@ -43,8 +45,11 @@ func NewMetrics(store Store) *Metrics {
 		sse: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "fwui_sse_clients", Help: "Connected Server-Sent Events clients.",
 		}),
+		ingest: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "fwui_flow_ingest_total", Help: "Flow agent uploads by result (accepted, unauthorized, invalid).",
+		}, []string{"result"}),
 	}
-	reg.MustRegister(m.requests, m.latency, m.mutations, m.sse,
+	reg.MustRegister(m.requests, m.latency, m.mutations, m.sse, m.ingest,
 		collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
 	if store != nil {
@@ -61,6 +66,43 @@ func (m *Metrics) Handler() http.Handler {
 func (m *Metrics) observeRequest(method, route, code string, d time.Duration) {
 	m.requests.WithLabelValues(method, route, code).Inc()
 	m.latency.WithLabelValues(method, route).Observe(d.Seconds())
+}
+
+// WatchFlows exposes the observed-flow store: stored flows and each node
+// agent's last upload (alert when time() minus it grows).
+func (m *Metrics) WatchFlows(store *flows.Store) {
+	if store != nil {
+		m.registry.MustRegister(&flowCollector{store: store})
+	}
+}
+
+func (m *Metrics) observeIngest(result string) {
+	if m != nil {
+		m.ingest.WithLabelValues(result).Inc()
+	}
+}
+
+var (
+	descFlows      = prometheus.NewDesc("fwui_flows_stored", "Observed flows currently stored.", nil, nil)
+	descAgentLast  = prometheus.NewDesc("fwui_flow_agent_last_report_timestamp_seconds", "Unix time of each node agent's last upload.", []string{"node"}, nil)
+	descAgentCount = prometheus.NewDesc("fwui_flow_agents", "Node agents that reported within the retention window.", nil, nil)
+)
+
+type flowCollector struct{ store *flows.Store }
+
+func (c *flowCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- descFlows
+	ch <- descAgentLast
+	ch <- descAgentCount
+}
+
+func (c *flowCollector) Collect(ch chan<- prometheus.Metric) {
+	agents := c.store.Agents()
+	ch <- prometheus.MustNewConstMetric(descFlows, prometheus.GaugeValue, float64(c.store.Len()))
+	ch <- prometheus.MustNewConstMetric(descAgentCount, prometheus.GaugeValue, float64(len(agents)))
+	for node, t := range agents {
+		ch <- prometheus.MustNewConstMetric(descAgentLast, prometheus.GaugeValue, float64(t.Unix()), node)
+	}
 }
 
 func (m *Metrics) observeMutation(action, result string) {

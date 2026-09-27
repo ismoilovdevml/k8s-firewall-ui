@@ -42,3 +42,13 @@ export function deniedBy(row: AccessRow): string {
   if (dst) return 'destination ingress denies'
   return ''
 }
+
+/** Agents upload every ~10s; silent for this long means the agent is down. */
+export const STALE_AGENT_MS = 2 * 60_000
+
+/** Node agents whose last upload is older than STALE_AGENT_MS. */
+export function staleAgents(agents: Record<string, string>, now: number): [string, string][] {
+  return Object.entries(agents)
+    .filter(([, at]) => now - new Date(at).getTime() > STALE_AGENT_MS)
+    .sort(([a], [b]) => a.localeCompare(b))
+}

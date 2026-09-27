@@ -25,11 +25,13 @@ func (s *Server) handleFlowIngest(w http.ResponseWriter, r *http.Request) {
 	}
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if subtle.ConstantTimeCompare([]byte(token), []byte(s.agentToken)) != 1 {
+		s.metrics.observeIngest("unauthorized")
 		writeError(w, http.StatusUnauthorized, "INVALID_AGENT_TOKEN", "invalid agent token")
 		return
 	}
 	var rep flows.Report
 	if err := json.NewDecoder(io.LimitReader(r.Body, maxIngestBytes)).Decode(&rep); err != nil {
+		s.metrics.observeIngest("invalid")
 		writeError(w, http.StatusBadRequest, "INVALID_INPUT", err.Error())
 		return
 	}
@@ -48,6 +50,7 @@ func (s *Server) handleFlowIngest(w http.ResponseWriter, r *http.Request) {
 	}
 	rep.Flows = kept
 	s.flows.Ingest(rep)
+	s.metrics.observeIngest("accepted")
 	writeJSON(w, http.StatusOK, map[string]int{"accepted": len(kept)})
 }
 

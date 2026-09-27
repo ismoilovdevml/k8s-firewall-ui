@@ -1,7 +1,7 @@
 import type { AccessSubject, FlowDirection, ObservedRow } from '../../api/types'
 import { useFlows } from '../../api/queries'
 import { Badge, Button, Card } from '../ui'
-import { peerId } from './flow'
+import { peerId, staleAgents } from './flow'
 
 function ago(iso: string): string {
   const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000))
@@ -35,6 +35,9 @@ export default function ObservedCard({
     )
   }
   const agents = Object.keys(data.agents).length
+  // Agents upload every ~10s; a node silent for minutes means a crashed or
+  // unschedulable agent, and its traffic is missing below.
+  const stale = staleAgents(data.agents, Date.now()).map(([node, at]) => `${node} (${ago(at)})`)
   return (
     <Card
       title={
@@ -44,6 +47,12 @@ export default function ObservedCard({
       }
     >
       {agents === 0 && <p className="mb-2 text-sm text-warn-text">No agent has reported yet.</p>}
+      {stale.length > 0 && (
+        <p className="mb-2 text-sm text-warn-text" data-stale-agents>
+          Agent silent on {stale.join(', ')} — traffic on {stale.length === 1 ? 'that node' : 'those nodes'} is not
+          being recorded. Check the agent DaemonSet before learning a policy.
+        </p>
+      )}
       <div className="grid gap-4 lg:grid-cols-2">
         <ObservedTable title="Connects to" direction="outbound" rows={data.outbound} onLearn={onLearn} />
         <ObservedTable title="Connected from" direction="inbound" rows={data.inbound} onLearn={onLearn} />

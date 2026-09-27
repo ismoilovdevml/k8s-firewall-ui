@@ -281,6 +281,7 @@ func run(ctx context.Context, c config, logger *slog.Logger) error {
 	}
 
 	metrics := api.NewMetrics(store)
+	metrics.WatchFlows(flowStore)
 	srv := api.NewServer(api.Options{
 		Store: store, Clientset: clientset, CNI: cniResult, K8sVersion: serverVersion,
 		ReadOnly: c.readOnly, Auth: authn, Audit: auditLog,
