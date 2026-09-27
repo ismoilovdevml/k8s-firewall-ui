@@ -544,6 +544,25 @@ func TestObservedFlowsAndLearning(t *testing.T) {
 		}
 	}
 
+	// The workload topology marks the observed edge.
+	w = h.do(http.MethodGet, "/api/v1/topology?namespaces=a,b", "")
+	var topo struct {
+		FlowsEnabled bool
+		Edges        []struct {
+			ID       string
+			Observed *struct{ Ports []struct{ Port int } }
+		}
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &topo); err != nil || !topo.FlowsEnabled {
+		t.Fatalf("topology = %d %s", w.Code, w.Body)
+	}
+	for _, e := range topo.Edges {
+		want := e.ID == "a/deployment/web->b/statefulset/db"
+		if got := e.Observed != nil; got != want || (want && e.Observed.Ports[0].Port != 5432) {
+			t.Errorf("edge %s observed = %+v", e.ID, e.Observed)
+		}
+	}
+
 	w = h.do(http.MethodPost, "/api/v1/flows/learn/plan", `{"subject":{"namespace":"a","workload":"deployment/web"},"direction":"outbound"}`)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "fwui-web-egress") ||
 		!strings.Contains(w.Body.String(), "93.184.216.34/32") || !strings.Contains(w.Body.String(), `"verified":true`) {

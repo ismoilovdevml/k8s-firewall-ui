@@ -60,11 +60,14 @@ export interface TopologyEdge {
   target: string
   verdict: EdgeVerdict
   policies?: PolicyRef[]
+  /** Set when node agents saw this connection. */
+  observed?: { ports: { protocol: string; port: number }[]; lastSeen: string }
 }
 
 export interface Topology {
   nodes: TopologyNode[]
   edges: TopologyEdge[]
+  flowsEnabled?: boolean
 }
 
 export interface PolicySummary {

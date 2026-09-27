@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ismoilovdevml/k8s-firewall-ui/internal/simulator"
 )
@@ -33,6 +34,55 @@ type topologyEdge struct {
 	Target   string                `json:"target"`
 	Verdict  simulator.EdgeVerdict `json:"verdict"`
 	Policies []simulator.PolicyRef `json:"policies,omitempty"`
+	// Observed is set when node agents saw this connection (flows enabled).
+	Observed *observedEdge `json:"observed,omitempty"`
+}
+
+type observedEdge struct {
+	Ports    []simulator.PortSpec `json:"ports"`
+	LastSeen time.Time            `json:"lastSeen"`
+}
+
+// observedEdges groups stored flows by workload pair ("src->dst" IDs).
+func (s *Server) observedEdges(v *view) map[string]*observedEdge {
+	out := map[string]*observedEdge{}
+	if s.flows == nil {
+		return out
+	}
+	pods := podsByIP(v.full)
+	for _, rec := range s.flows.All() {
+		src, ok1 := pods[rec.Src]
+		dst, ok2 := pods[rec.Dst]
+		if !ok1 || !ok2 || sameWorkload(src, dst) {
+			continue
+		}
+		id := src.Namespace + "/" + src.Owner + "->" + dst.Namespace + "/" + dst.Owner
+		e := out[id]
+		if e == nil {
+			e = &observedEdge{}
+			out[id] = e
+		}
+		port := simulator.PortSpec{Protocol: rec.Protocol, Port: int32(rec.DstPort)}
+		if !containsPort(e.Ports, port) {
+			e.Ports = append(e.Ports, port)
+		}
+		if rec.LastSeen.After(e.LastSeen) {
+			e.LastSeen = rec.LastSeen
+		}
+	}
+	for _, e := range out {
+		sort.Slice(e.Ports, func(i, j int) bool { return e.Ports[i].Port < e.Ports[j].Port })
+	}
+	return out
+}
+
+func containsPort(ps []simulator.PortSpec, p simulator.PortSpec) bool {
+	for _, q := range ps {
+		if q == p {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +125,7 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request) {
 	}
 
 	idx := simulator.NewIndex(snap)
+	observed := s.observedEdges(v)
 	edges := []topologyEdge{}
 	for _, src := range workloads {
 		for _, dst := range workloads {
@@ -88,11 +139,12 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request) {
 				Target:   dst.ID,
 				Verdict:  verdict,
 				Policies: dedupeRefs(policies),
+				Observed: observed[src.ID+"->"+dst.ID],
 			})
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"nodes": nodes, "edges": edges})
+	writeJSON(w, http.StatusOK, map[string]any{"nodes": nodes, "edges": edges, "flowsEnabled": s.flows != nil})
 }
 
 func dedupeRefs(refs []simulator.PolicyRef) []simulator.PolicyRef {

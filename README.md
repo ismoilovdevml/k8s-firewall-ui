@@ -22,6 +22,10 @@
 
   ![Observed traffic](docs/screenshots/observed.png)
 
+  The topology draws observed connections as heavy lines, can hide everything else, and flags traffic that was flowing but current policies now block:
+
+  ![Observed traffic on the topology](docs/screenshots/topology-observed.png)
+
 - 🗺️ **Topology viewer**: a namespace-level map of the whole cluster (fully open, partially open, blocked, unrestricted between every pair of teams) that drills down into a live workload graph. Green means allowed by policy, red means blocked, dotted means no policy applies. Filter by verdict, and click an edge to see which policies decide it.
 
   ![Topology](docs/screenshots/topology-namespaces.png)

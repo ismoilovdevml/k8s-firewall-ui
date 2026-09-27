@@ -40,6 +40,24 @@ test('the agent reports real connections with their current verdict', async ({ p
   await page.screenshot({ path: 'e2e-results/shots/observed.png', fullPage: true })
 })
 
+test('the topology highlights observed connections', async ({ page }) => {
+  await page.goto('/topology')
+  await page.locator('.react-flow__node', { hasText: 'analytics' }).click()
+  await expect(page.getByRole('button', { name: 'Workloads' })).toHaveAttribute('aria-pressed', 'true')
+  const observedOnly = page.getByRole('button', { name: /^observed only/ })
+  await observedOnly.click()
+  await expect(observedOnly).toHaveAttribute('aria-pressed', 'true')
+  const edge = page.getByTestId('rf__edge-analytics/deployment/collector->analytics/deployment/dashboard')
+  // SVG groups have no box of their own, so check attachment, not visibility.
+  await expect(edge).toBeAttached()
+  // Only observed pairs remain (collector ⇄ dashboard at most).
+  expect(await page.locator('.react-flow__edge').count()).toBeLessThanOrEqual(2)
+  // The reverse edge runs parallel a few pixels away; click this one exactly.
+  await edge.dispatchEvent('click')
+  await expect(page.locator('[data-edge-observed]')).toContainText('3000/TCP')
+  await page.screenshot({ path: 'e2e-results/shots/topology-observed.png' })
+})
+
 test('learn: allow only observed traffic, verified by real connections', async ({ page }) => {
   const observed = await observedOutbound(page.request)
   const observedIDs = new Set(observed.filter((r) => r.peer.kind === 'workload').map((r) => `${r.peer.namespace}/${r.peer.workload}`))

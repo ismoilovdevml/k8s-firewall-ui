@@ -72,6 +72,7 @@ function WorkloadTopology({
     blocked: true,
     unconstrained: true,
   })
+  const [observedOnly, setObservedOnly] = useState(false)
 
   const topology = useTopology(selected)
 
@@ -90,7 +91,8 @@ function WorkloadTopology({
         type: 'floating',
         source: e.source,
         target: e.target,
-        style: { stroke: style.stroke, strokeDasharray: style.dash },
+        // Observed traffic is drawn heavier than what policy merely permits.
+        style: { stroke: style.stroke, strokeDasharray: e.observed ? undefined : style.dash, strokeWidth: e.observed ? 3.5 : 1.5 },
         markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
         data: { edge: e },
       }
@@ -100,9 +102,16 @@ function WorkloadTopology({
     return { nodes: layoutCircle(rfNodes), edges: rfEdges }
   }, [topology.data])
   const shownEdges = useMemo(
-    () => edges.filter((e) => visible[(e.data as { edge: TopologyEdge }).edge.verdict]),
-    [edges, visible],
+    () =>
+      edges.filter((e) => {
+        const edge = (e.data as { edge: TopologyEdge }).edge
+        return visible[edge.verdict] && (!observedOnly || edge.observed)
+      }),
+    [edges, visible, observedOnly],
   )
+  const observedCount = topology.data?.edges.filter((e) => e.observed).length ?? 0
+  // Traffic that was flowing but current policies block: likely broken.
+  const observedBlocked = topology.data?.edges.filter((e) => e.observed && e.verdict === 'blocked').length ?? 0
   const counts = useMemo(() => {
     const c: Record<EdgeVerdict, number> = { allowed: 0, blocked: 0, unconstrained: 0 }
     for (const e of topology.data?.edges ?? []) c[e.verdict]++
@@ -166,6 +175,30 @@ function WorkloadTopology({
               {topology.data && <span className="text-quiet">{counts[v]}</span>}
             </button>
           ))}
+          {topology.data?.flowsEnabled && (
+            <>
+              <span className="mx-1 h-4 w-px bg-edge" />
+              <button
+                aria-pressed={observedOnly}
+                onClick={() => setObservedOnly((cur) => !cur)}
+                title="Only connections the node agents actually saw (thick lines)"
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 transition ${
+                  observedOnly ? 'border-accent/60 bg-accent/10 text-accent-strong' : 'border-edge bg-surface text-text'
+                }`}
+              >
+                <svg width="24" height="6">
+                  <line x1="0" y1="3" x2="24" y2="3" stroke="currentColor" strokeWidth="3.5" />
+                </svg>
+                observed only
+                <span className="text-quiet">{observedCount}</span>
+              </button>
+              {observedBlocked > 0 && (
+                <span className="rounded-full bg-block/10 px-2.5 py-0.5 text-block" data-observed-blocked>
+                  {observedBlocked} observed connection{observedBlocked === 1 ? '' : 's'} now blocked
+                </span>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -225,6 +258,18 @@ function WorkloadTopology({
             >
               {VERDICT_STYLE[activeEdge.verdict].label}
             </div>
+            {activeEdge.observed && (
+              <div className="mt-2 text-sm text-text" data-edge-observed>
+                Observed on{' '}
+                <span className="font-mono">
+                  {activeEdge.observed.ports.map((p) => `${p.port}/${p.protocol}`).join(', ')}
+                </span>
+                , last {new Date(activeEdge.observed.lastSeen).toLocaleTimeString()}
+                {activeEdge.verdict === 'blocked' && (
+                  <p className="mt-1 text-block">This traffic was flowing but current policies block it.</p>
+                )}
+              </div>
+            )}
             <div className="mt-3">
               <div className="font-mono text-xs uppercase tracking-wide text-quiet">
                 policies involved

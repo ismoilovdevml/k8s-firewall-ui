@@ -105,6 +105,8 @@ Enabled when the server runs with `--agent-token` (Helm `flows.enabled=true`). F
 
 `GET /api/v1/flows?namespace=ns[&workload=deployment/web]` → `{enabled, agents: {node: lastUpload}, subject, outbound: [row], inbound: [row]}`. A row is `{peer, allowedNow, lastSeen, ports: [{protocol, port, allowedNow, lastSeen, samples, serviceIP?}]}`; `allowedNow` is the verdict of the current policies for that observed connection.
 
+`GET /api/v1/topology?namespaces=…` adds `flowsEnabled` and, on each edge the agents saw, `observed: {ports: [{protocol, port}], lastSeen}`.
+
 `POST /api/v1/flows/learn/plan` with `{subject, direction: inbound|outbound}` → a plan (same shape as `/access/plan`) that allows exactly the observed peers and ports for that direction (plus DNS for outbound) and isolates the rest. `POST /api/v1/flows/learn/apply` with the same body plus the reviewed `signature` applies it like `/access/apply`.
 
 ## Posture
