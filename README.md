@@ -6,7 +6,7 @@
 
 ![Walkthrough](docs/media/walkthrough.gif)
 
-*A 55-second tour recorded by the Playwright suite against a real k3s cluster ([MP4](docs/media/walkthrough.mp4)).*
+*An 85-second tour recorded by the Playwright suite against a real k3s cluster ([MP4](docs/media/walkthrough.mp4)).*
 
 ## Features
 

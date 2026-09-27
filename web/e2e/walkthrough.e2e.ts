@@ -101,7 +101,22 @@ test('walkthrough', async ({ page }) => {
   await caption(page, works ? 'Applied — and the real connection from the pod now succeeds ✓' : 'Applied', 3000)
   deleteManaged('payments', 'fwui-ledger-db-ingress')
 
-  // 7. Template + impact preview + create
+  // 7. Observed traffic → least-privilege policy
+  for (const [ns, app, port] of [['analytics', 'dashboard', 3000], ['payments', 'payments-api', 8443]] as const) {
+    canConnect('analytics', 'collector', ns, app, port)
+  }
+  await page.getByLabel('namespace', { exact: true }).selectOption('analytics')
+  await page.getByLabel('workload', { exact: true }).selectOption('deployment/collector')
+  const observed = page.locator('[data-observed="outbound"]')
+  await expect(observed.locator('tr[data-observed-peer="analytics/deployment/dashboard"]')).toBeVisible({ timeout: 30_000 })
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await caption(page, 'Observed traffic: node agents report what each workload actually talks to — IPs, ports, Services', 3800)
+  await observed.getByRole('button', { name: 'Allow only observed outbound' }).click()
+  await expect(page.getByRole('dialog').getByText('verified by the simulator')).toBeVisible()
+  await caption(page, 'Learning mode: allow exactly the observed traffic (DNS kept), verified before it is applied', 3800)
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click()
+
+  // 8. Template + impact preview + create
   await page.goto('/policies/new?namespace=analytics')
   await caption(page, 'Start from a proven template…', 1500)
   await page.getByRole('button', { name: /Default deny all \(keeps DNS\)/ }).click()
@@ -114,12 +129,12 @@ test('walkthrough', async ({ page }) => {
   await expect(page).toHaveURL(/default-deny-all$/)
   await caption(page, 'Applied with the signed-in user’s own credentials', 2200)
 
-  // 8. Audit
+  // 9. Audit
   await page.getByRole('link', { name: /Audit log/ }).click()
   await page.getByRole('button', { name: 'Details' }).first().click()
   await caption(page, 'Audit log: who changed what, from where, with a YAML diff', 3200)
 
-  // 9. Delete with reverse impact
+  // 10. Delete with reverse impact
   await page.goto('/policies/analytics/default-deny-all')
   await page.getByRole('button', { name: 'Delete' }).click()
   await expect(page.getByText(/become allowed/)).toBeVisible()
