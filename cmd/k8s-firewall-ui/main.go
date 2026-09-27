@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -387,6 +388,8 @@ func runAgent(args []string) int {
 	interval := fs.Duration("interval", 10*time.Second, "collection interval")
 	logFormat := fs.String("log-format", "text", "text | json")
 	caFile := fs.String("ca-file", "", "PEM file with the CA (or self-signed certificate) of an HTTPS server")
+	fanout := fs.Bool("fanout", false, "resolve the server host (a headless Service) and upload to every replica")
+	tlsServerName := fs.String("tls-server-name", "", "name to verify in the server certificate (default: the --server host)")
 	_ = fs.Parse(args)
 	if err := applyEnv(fs); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -406,25 +409,33 @@ func runAgent(args []string) int {
 		return 2
 	}
 	logger := newLogger(*logFormat, "info")
-	client := &http.Client{Timeout: 10 * time.Second}
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: *tlsServerName}
+	if *fanout && tlsConfig.ServerName == "" {
+		// Uploads go to IP addresses; verify the certificate against the
+		// configured host name instead.
+		if u, err := url.Parse(*server); err == nil {
+			tlsConfig.ServerName = u.Hostname()
+		}
+	}
 	if *caFile != "" {
 		pem, err := os.ReadFile(*caFile)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "agent:", err)
 			return 2
 		}
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(pem) {
+		tlsConfig.RootCAs = x509.NewCertPool()
+		if !tlsConfig.RootCAs.AppendCertsFromPEM(pem) {
 			fmt.Fprintln(os.Stderr, "agent: no certificates in", *caFile)
 			return 2
 		}
-		client.Transport = &http.Transport{Proxy: http.ProxyFromEnvironment, TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}
 	}
+	// No proxy: agents talk to the in-cluster server directly.
+	client := &http.Client{Timeout: 10 * time.Second, Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	logger.Info("flow agent started", "node", *node, "server", *server, "interval", *interval)
 	if err := flows.RunAgent(ctx, flows.AgentConfig{
-		Server: strings.TrimRight(*server, "/"), Token: *token, Node: *node, Interval: *interval, Logger: logger, Client: client,
+		Server: strings.TrimRight(*server, "/"), Token: *token, Node: *node, Interval: *interval, Logger: logger, Client: client, Fanout: *fanout,
 	}); err != nil {
 		logger.Error("agent stopped", "error", err)
 		return 1

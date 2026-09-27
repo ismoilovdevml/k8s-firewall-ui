@@ -220,10 +220,11 @@ current policies allow it, and can build a least-privilege policy from it.
   bypass conntrack report nothing.
 - Only established connections are recorded: packets a policy drops never
   show up, so observe *before* locking a workload down.
-- Flows live in the server's memory (`flows.retention`). With several
-  replicas, each agent posts to one of them through the Service, so each
-  replica sees part of the traffic; run one replica while learning.
-- With `tls.enabled`, agents trust `tls.secretName`'s `flows.agent.caKey`.
+- Flows live in the server's memory (`flows.retention`) and restart empty.
+  Agents resolve a headless Service (`<fullname>-replicas`) and upload to
+  every replica, so all replicas show the same traffic.
+- With `tls.enabled`, agents trust `tls.secretName`'s `flows.agent.caKey`
+  and verify the certificate for `<fullname>.<namespace>.svc`.
   With `networkPolicy.ingressFrom` set, add the node CIDRs to
   `networkPolicy.agentCIDRs`.
 

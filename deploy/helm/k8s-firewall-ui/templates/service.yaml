@@ -16,3 +16,22 @@ spec:
       targetPort: http
   selector:
     {{- include "k8s-firewall-ui.selectorLabels" . | nindent 4 }}
+{{- if .Values.flows.enabled }}
+---
+# Headless Service: flow agents resolve it to every server replica and
+# upload to each, so every replica sees all observed traffic.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "k8s-firewall-ui.fullname" . }}-replicas
+  labels:
+    {{- include "k8s-firewall-ui.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    {{- include "k8s-firewall-ui.selectorLabels" . | nindent 4 }}
+{{- end }}

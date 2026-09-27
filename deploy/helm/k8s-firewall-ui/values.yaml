@@ -93,10 +93,12 @@ flows:
   existingSecretKey: agent-token
   agent:
     interval: 10s
-    # Defaults to the in-cluster Service URL.
+    # Default: upload to every server replica through a headless Service.
+    # Set a URL to post to a single endpoint instead.
     serverURL: ""
     # tls.enabled: key of tls.secretName holding the certificate the agent
-    # trusts (tls.crt for self-signed, ca.crt if your issuer adds one).
+    # trusts (tls.crt for self-signed, ca.crt if your issuer adds one). The
+    # certificate must be valid for <fullname>.<namespace>.svc.
     caKey: tls.crt
     resources:
       requests: {cpu: 10m, memory: 32Mi}

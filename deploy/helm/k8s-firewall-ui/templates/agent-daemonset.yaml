@@ -1,5 +1,6 @@
 {{- if .Values.flows.enabled }}
 {{- $scheme := ternary "https" "http" .Values.tls.enabled }}
+{{- $fullname := include "k8s-firewall-ui.fullname" . }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -37,7 +38,14 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - agent
-            - --server={{ .Values.flows.agent.serverURL | default (printf "%s://%s.%s.svc:%v" $scheme (include "k8s-firewall-ui.fullname" .) .Release.Namespace .Values.service.port) }}
+            {{- if .Values.flows.agent.serverURL }}
+            - --server={{ .Values.flows.agent.serverURL }}
+            {{- else }}
+            # Every replica gets every upload (headless Service fan-out).
+            - --server={{ printf "%s://%s-replicas.%s.svc:8080" $scheme $fullname .Release.Namespace }}
+            - --fanout
+            - --tls-server-name={{ printf "%s.%s.svc" $fullname .Release.Namespace }}
+            {{- end }}
             - --interval={{ .Values.flows.agent.interval }}
             - --log-format={{ .Values.logging.format }}
             {{- if .Values.tls.enabled }}

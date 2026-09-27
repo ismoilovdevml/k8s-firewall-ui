@@ -3,8 +3,10 @@ package flows
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -78,5 +80,36 @@ func TestAgentUploads(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("agent never uploaded")
+	}
+}
+
+func TestAgentFanoutReachesEveryReplica(t *testing.T) {
+	hits := make(chan string, 4)
+	handler := func(name string) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits <- name })
+	}
+	a, b := httptest.NewServer(handler("a")), httptest.NewServer(handler("b"))
+	defer a.Close()
+	defer b.Close()
+	// Both test servers listen on 127.0.0.1 with different ports, so the
+	// fake resolver returns host:port pairs via distinct "hosts".
+	cfg := AgentConfig{Server: "http://replicas.example:1", Fanout: true,
+		Resolve: func(context.Context, string) ([]string, error) { return []string{"127.0.0.1", "127.0.0.2"}, nil }}
+	got, err := targets(context.Background(), cfg)
+	if err != nil || len(got) != 2 || got[0] != "http://127.0.0.1:1" || got[1] != "http://127.0.0.2:1" {
+		t.Fatalf("targets = %v, %v", got, err)
+	}
+
+	cfg.Resolve = func(context.Context, string) ([]string, error) { return []string{"127.0.0.1"}, nil }
+	cfg.Collect = func() ([]Flow, error) { return nil, nil }
+	cfg.Client, cfg.Logger = http.DefaultClient, slog.Default()
+	for _, srv := range []*httptest.Server{a, b} {
+		cfg.Server = "http://replicas.example:" + srv.URL[strings.LastIndex(srv.URL, ":")+1:]
+		if err := uploadOnce(context.Background(), cfg); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if first, second := <-hits, <-hits; first != "a" || second != "b" {
+		t.Fatalf("hits = %s, %s", first, second)
 	}
 }
