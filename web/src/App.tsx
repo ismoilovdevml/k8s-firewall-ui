@@ -6,6 +6,9 @@ import AuthGate from './components/AuthGate'
 import Layout from './components/Layout'
 import OverviewPage from './pages/OverviewPage'
 import LoginPage from './pages/LoginPage'
+import { EmptyState } from './components/ui'
+import { buttonClass } from './components/styles'
+import { IconSearch } from './components/icons'
 
 // Heavy pages (React Flow, CodeMirror) load on demand.
 const TopologyPage = lazy(() => import('./pages/TopologyPage'))
@@ -60,11 +63,17 @@ export default function App() {
 
 function NotFound() {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted">
-      <p>This page does not exist.</p>
-      <Link to="/" className="font-medium text-accent-strong hover:underline">
-        Back to overview
-      </Link>
-    </div>
+    <EmptyState
+      className="h-full"
+      icon={<IconSearch size={22} />}
+      title="This page does not exist"
+      action={
+        <Link to="/" className={buttonClass('primary')}>
+          Back to overview
+        </Link>
+      }
+    >
+      Check the address, or use the search (Ctrl+K) to jump anywhere.
+    </EmptyState>
   )
 }

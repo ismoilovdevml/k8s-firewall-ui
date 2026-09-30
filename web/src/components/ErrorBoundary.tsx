@@ -21,12 +21,12 @@ export default class ErrorBoundary extends Component<{ children: ReactNode }, St
     if (!this.state.error) return this.props.children
     return (
       <div className="p-6">
-        <div className="max-w-xl rounded-xl border border-block/40 bg-block/5 p-5">
-          <h1 className="font-bold text-block">Something went wrong on this page</h1>
+        <div className="max-w-xl rounded-xl border border-block/30 bg-block-soft p-5">
+          <h1 className="font-semibold text-block">Something went wrong on this page</h1>
           <p className="mt-2 font-mono text-xs text-text">{this.state.error.message}</p>
           <button
             onClick={() => this.setState({ error: null })}
-            className="mt-4 rounded border border-edge bg-surface px-3 py-1.5 text-sm text-muted hover:text-text"
+            className="mt-4 h-9 rounded-lg border border-edge bg-surface px-3.5 text-sm font-medium text-text hover:bg-raised"
           >
             Try again
           </button>

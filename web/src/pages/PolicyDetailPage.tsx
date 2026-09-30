@@ -4,13 +4,41 @@ import { useDeletePolicy, usePermissions, usePolicyDetail, useUpdatePolicy } fro
 import { ApiError, errorMessage } from '../api/client'
 import { draftToPolicy, policyToDraft } from '../policy/model'
 import type { PolicyDraft } from '../policy/model'
-import { isolationText, ruleText } from '../policy/describe'
+import { isolationText, labelsText, ruleText } from '../policy/describe'
 import YamlEditor from '../components/YamlEditor'
 import PolicyForm from '../components/policy-form/PolicyForm'
 import ImpactPanel from '../components/ImpactPanel'
 import DiffView from '../components/DiffView'
 import { stringify } from 'yaml'
 import { PolicyFindingsCard } from '../components/PolicyFindings'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Feedback,
+  Modal,
+  Page,
+  PageHeader,
+  Spinner,
+  THead,
+  Table,
+  Tabs,
+} from '../components/ui'
+import { buttonClass, td, th } from '../components/styles'
+import {
+  IconArrowLeft,
+  IconArrowRight,
+  IconBox,
+  IconCode,
+  IconDownload,
+  IconEye,
+  IconFileText,
+  IconPencilRuler,
+  IconShieldCheck,
+  IconTrash,
+} from '../components/icons'
 
 type Tab = 'overview' | 'edit' | 'yaml' | 'pods'
 
@@ -39,8 +67,16 @@ export default function PolicyDetailPage() {
   const conversion = useMemo(() => (data ? policyToDraft(data.policy) : null), [data])
   const draftPolicy = useMemo(() => (draft ? draftToPolicy(draft) : null), [draft])
 
-  if (isLoading) return <PageNote>Loading…</PageNote>
-  if (error instanceof ApiError) return <PageNote tone="error">{error.message}</PageNote>
+  if (isLoading) return <Spinner />
+  if (error instanceof ApiError)
+    return (
+      <Page width="narrow">
+        <BackLink />
+        <Alert tone="block" title="Could not load this policy">
+          {error.message}
+        </Alert>
+      </Page>
+    )
   if (!data || !conversion) return null
 
   const startEdit = () => {
@@ -86,117 +122,166 @@ export default function PolicyDetailPage() {
   }
 
   const doDelete = () =>
-    remove.mutate(
-      { namespace, name },
-      { onSuccess: () => navigate('/policies'), onError: feedbackFrom },
-    )
+    remove.mutate({ namespace, name }, { onSuccess: () => navigate('/policies'), onError: feedbackFrom })
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'edit', label: 'Edit' },
-    { id: 'yaml', label: 'YAML' },
-    { id: 'pods', label: `Affected pods (${data.affectedPods.length})` },
+  const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'overview', label: 'Overview', icon: <IconEye size={15} /> },
+    { id: 'edit', label: 'Edit', icon: <IconPencilRuler size={15} /> },
+    { id: 'yaml', label: 'YAML', icon: <IconCode size={15} /> },
+    { id: 'pods', label: `Affected pods (${data.affectedPods.length})`, icon: <IconBox size={15} /> },
   ]
+  const spec = data.policy.spec
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <Link to="/policies" className="font-mono text-xs text-quiet hover:text-accent-strong">
-            ← policies
-          </Link>
-          <h1 className="mt-1 text-lg font-bold text-text">
-            <span className="text-muted">{namespace}/</span>
+    <Page>
+      <PageHeader
+        back={<BackLink />}
+        icon={<IconFileText size={20} />}
+        title={
+          <span className="font-mono">
+            <span className="text-quiet">{namespace}/</span>
             {name}
-          </h1>
-        </div>
-        <div className="flex gap-2">
-          <a
-            href={`data:application/yaml;charset=utf-8,${encodeURIComponent(data.yaml)}`}
-            download={`${namespace}-${name}.yaml`}
-            className="rounded border border-edge bg-surface px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong"
-          >
-            Download YAML
-          </a>
-          <button
-            onClick={() => setConfirmDelete(true)}
-            disabled={perms?.delete === false}
-            title={perms?.delete === false ? 'You are not allowed to delete policies in this namespace' : undefined}
-            className="rounded border border-block/50 px-3 py-1.5 text-sm text-block hover:bg-block/10 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Delete
-          </button>
-        </div>
+          </span>
+        }
+        subtitle={
+          <span className="flex flex-wrap items-center gap-1.5">
+            {(spec.policyTypes ?? []).map((t) => (
+              <Badge key={t} tone={t === 'Ingress' ? 'info' : 'neutral'}>
+                {t}
+              </Badge>
+            ))}
+            <Badge tone={data.affectedPods.length > 0 ? 'ok' : 'warn'} dot>
+              {data.affectedPods.length} pod{data.affectedPods.length === 1 ? '' : 's'} selected
+            </Badge>
+            <span className="text-xs text-quiet">
+              selector: <span className="font-mono">{labelsText(conversion.draft.podSelector, 'all pods')}</span>
+            </span>
+          </span>
+        }
+        actions={
+          <>
+            <a
+              href={`data:application/yaml;charset=utf-8,${encodeURIComponent(data.yaml)}`}
+              download={`${namespace}-${name}.yaml`}
+              className={buttonClass('secondary')}
+            >
+              <IconDownload size={16} /> Download YAML
+            </a>
+            <Button
+              variant="danger-outline"
+              icon={<IconTrash size={16} />}
+              onClick={() => setConfirmDelete(true)}
+              disabled={perms?.delete === false}
+              title={perms?.delete === false ? 'You are not allowed to delete policies in this namespace' : undefined}
+            >
+              Delete
+            </Button>
+          </>
+        }
+      />
+
+      <div>
+        <Tabs
+          tabs={TABS}
+          value={tab}
+          onChange={(id) => (id === 'edit' ? startEdit() : (setTab(id), setFeedback(null)))}
+        />
+        {feedback && <Feedback tone={feedback.tone}>{feedback.text}</Feedback>}
       </div>
 
-      <div className="mt-4 flex gap-1 border-b border-edge">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => (t.id === 'edit' ? startEdit() : (setTab(t.id), setFeedback(null)))}
-            className={`px-3 py-2 font-mono text-xs ${
-              tab === t.id
-                ? 'border-b-2 border-accent text-accent-strong'
-                : 'text-muted hover:text-text'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {feedback && (
-        <p
-          className={`mt-3 font-mono text-xs ${feedback.tone === 'ok' ? 'text-accent-strong' : 'text-block'}`}
-        >
-          {feedback.text}
-        </p>
-      )}
-
-      <div className="mt-4">
-        {tab === 'overview' && (
+      {tab === 'overview' && (
+        <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
           <div className="space-y-4">
             <PolicyFindingsCard namespace={namespace} name={name} />
-            <section className="rounded-md border border-edge bg-surface p-4">
-              <h2 className="font-mono text-[11px] uppercase tracking-wide text-quiet">effect</h2>
-              <ul className="mt-2 space-y-1 text-sm text-text">
-                {isolationText(conversion.draft).map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            </section>
             {(['ingress', 'egress'] as const).map(
               (dir) =>
                 conversion.draft[dir].length > 0 && (
-                  <section key={dir} className="rounded-md border border-edge bg-surface p-4">
-                    <h2 className="font-mono text-[11px] uppercase tracking-wide text-quiet">
-                      {dir} rules
-                    </h2>
-                    <ol className="mt-2 list-inside list-decimal space-y-1 text-sm text-text">
+                  <Card
+                    key={dir}
+                    title={
+                      dir === 'ingress' ? 'Ingress rules — who may connect in' : 'Egress rules — where pods may connect'
+                    }
+                    description="Rules are additive: traffic matching any rule is allowed."
+                  >
+                    <ol className="space-y-2">
                       {conversion.draft[dir].map((rule, i) => (
-                        <li key={i}>{ruleText(rule, dir)}</li>
+                        <li
+                          key={i}
+                          className="flex items-start gap-3 rounded-lg border border-edge bg-raised/40 p-3 text-sm text-text"
+                        >
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent-strong">
+                            {i + 1}
+                          </span>
+                          <span className="leading-relaxed">{ruleText(rule, dir)}</span>
+                        </li>
                       ))}
                     </ol>
-                  </section>
+                  </Card>
                 ),
             )}
           </div>
-        )}
-
-        {tab === 'edit' &&
-          (conversion.lossy.length > 0 ? (
-            <div className="rounded-md border border-accent/40 bg-accent/5 p-4 text-sm text-text">
-              <p>This policy uses features the form cannot edit:</p>
-              <ul className="mt-1 list-inside list-disc font-mono text-xs text-accent-strong">
-                {conversion.lossy.map((l) => (
-                  <li key={l}>{l}</li>
+          <div className="space-y-4">
+            <Card title="Effect" description="What this policy does to the pods it selects.">
+              <ul className="space-y-2 text-sm text-text">
+                {isolationText(conversion.draft).map((line) => (
+                  <li key={line} className="flex items-start gap-2">
+                    <IconShieldCheck size={15} className="mt-0.5 text-accent-strong" />
+                    <span>{line}</span>
+                  </li>
                 ))}
               </ul>
-              <p className="mt-2 text-muted">Use the YAML tab instead.</p>
-            </div>
-          ) : (
-            draft && (
-              <div>
+            </Card>
+            <Card title="Next steps">
+              <div className="flex flex-col gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={startEdit}
+                  className="inline-flex items-center gap-1.5 text-left font-medium text-accent-strong hover:underline"
+                >
+                  <IconPencilRuler size={15} /> Edit this policy with the form
+                </button>
+                <Link
+                  to="/simulator"
+                  className="inline-flex items-center gap-1.5 font-medium text-accent-strong hover:underline"
+                >
+                  <IconArrowRight size={15} /> Test a connection in the simulator
+                </Link>
+                <Link
+                  to={`/firewall?namespace=${encodeURIComponent(namespace)}`}
+                  className="inline-flex items-center gap-1.5 font-medium text-accent-strong hover:underline"
+                >
+                  <IconArrowRight size={15} /> Open the {namespace} firewall
+                </Link>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {tab === 'edit' &&
+        (conversion.lossy.length > 0 ? (
+          <Alert tone="info" title="This policy uses features the form cannot edit">
+            <ul className="mt-1 list-inside list-disc font-mono text-xs">
+              {conversion.lossy.map((l) => (
+                <li key={l}>{l}</li>
+              ))}
+            </ul>
+            <p className="mt-2">
+              Use the{' '}
+              <button
+                type="button"
+                className="font-semibold text-accent-strong hover:underline"
+                onClick={() => setTab('yaml')}
+              >
+                YAML tab
+              </button>{' '}
+              instead.
+            </p>
+          </Alert>
+        ) : (
+          draft && (
+            <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+              <div className="space-y-4">
                 <PolicyForm value={draft} onChange={setDraft} identityLocked />
                 <ReviewChanges
                   before={stringify(draftToPolicy(conversion.draft))}
@@ -208,15 +293,17 @@ export default function PolicyDetailPage() {
                   onValidate={() => validateOrApply(true)}
                   onApply={() => validateOrApply(false)}
                 />
-                <div className="mt-4">
-                  <ImpactPanel request={draftPolicy ? { operation: 'apply', namespace, policy: draftPolicy } : null} />
-                </div>
               </div>
-            )
-          ))}
+              <div className="lg:sticky lg:top-4 lg:self-start">
+                <ImpactPanel request={draftPolicy ? { operation: 'apply', namespace, policy: draftPolicy } : null} />
+              </div>
+            </div>
+          )
+        ))}
 
-        {tab === 'yaml' && (
-          <div>
+      {tab === 'yaml' && (
+        <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+          <div className="space-y-4">
             <YamlEditor value={yamlText} onChange={setYamlText} />
             <ReviewChanges before={data.yaml} after={yamlText} />
             <ApplyBar
@@ -225,78 +312,81 @@ export default function PolicyDetailPage() {
               onValidate={() => validateOrApply(true)}
               onApply={() => validateOrApply(false)}
             />
-            <div className="mt-4">
-              <ImpactPanel request={{ operation: 'apply', namespace, yaml: yamlText }} />
-            </div>
           </div>
-        )}
-
-        {tab === 'pods' && (
-          <div className="overflow-x-auto rounded-md border border-edge">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-surface font-mono text-[11px] uppercase tracking-wide text-quiet">
-                <tr>
-                  <th className="px-4 py-2 font-medium">pod</th>
-                  <th className="px-4 py-2 font-medium">workload</th>
-                  <th className="px-4 py-2 font-medium">ip</th>
-                  <th className="px-4 py-2 font-medium">phase</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.affectedPods.map((p) => (
-                  <tr key={p.name} className="border-t border-edge">
-                    <td className="px-4 py-2 font-mono text-xs text-text">{p.name}</td>
-                    <td className="px-4 py-2 font-mono text-xs text-muted">{p.owner}</td>
-                    <td className="px-4 py-2 font-mono text-xs text-muted">{p.ip}</td>
-                    <td className="px-4 py-2 font-mono text-xs text-muted">{p.phase}</td>
-                  </tr>
-                ))}
-                {data.affectedPods.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-sm text-muted">
-                      No running pods match this policy's selector right now.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {confirmDelete && (
-        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/60 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-md border border-edge bg-surface p-5 shadow-xl">
-            <h2 className="font-mono text-sm font-semibold text-text">
-              Delete {namespace}/{name}?
-            </h2>
-            <p className="mt-2 text-sm text-muted">
-              {data.affectedPods.length > 0
-                ? `${data.affectedPods.length} pod(s) currently matched by this policy will lose its restrictions/allowances.`
-                : 'No pods are currently matched by this policy.'}
-            </p>
-            <div className="mt-3">
-              <ImpactPanel auto request={{ operation: 'delete', namespace, name }} />
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:text-text"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={doDelete}
-                disabled={remove.isPending}
-                className="rounded bg-block px-3 py-1.5 text-sm font-medium text-on-accent hover:brightness-110 disabled:opacity-50"
-              >
-                Delete policy
-              </button>
-            </div>
+          <div className="lg:sticky lg:top-4 lg:self-start">
+            <ImpactPanel request={{ operation: 'apply', namespace, yaml: yamlText }} />
           </div>
         </div>
       )}
-    </div>
+
+      {tab === 'pods' && (
+        <Card flush>
+          <Table>
+            <THead>
+              <th className={th}>Pod</th>
+              <th className={th}>Workload</th>
+              <th className={th}>IP</th>
+              <th className={th}>Phase</th>
+            </THead>
+            <tbody>
+              {data.affectedPods.map((p) => (
+                <tr key={p.name} className="border-b border-edge/70 last:border-0">
+                  <td className={`${td} font-mono text-xs text-text`}>{p.name}</td>
+                  <td className={`${td} font-mono text-xs text-muted`}>{p.owner}</td>
+                  <td className={`${td} font-mono text-xs text-muted`}>{p.ip}</td>
+                  <td className={td}>
+                    <Badge tone={p.phase === 'Running' ? 'ok' : 'neutral'} dot>
+                      {p.phase}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+              {data.affectedPods.length === 0 && (
+                <tr>
+                  <td colSpan={4}>
+                    <EmptyState icon={<IconBox size={22} />} title="No pods selected">
+                      No running pods match this policy's selector right now.
+                    </EmptyState>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </Table>
+        </Card>
+      )}
+
+      {confirmDelete && (
+        <Modal
+          title={`Delete ${namespace}/${name}?`}
+          description={
+            data.affectedPods.length > 0
+              ? `${data.affectedPods.length} pod(s) currently matched by this policy will lose its restrictions/allowances.`
+              : 'No pods are currently matched by this policy.'
+          }
+          onClose={() => setConfirmDelete(false)}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={doDelete} disabled={remove.isPending} icon={<IconTrash size={16} />}>
+                Delete policy
+              </Button>
+            </>
+          }
+        >
+          <ImpactPanel auto request={{ operation: 'delete', namespace, name }} />
+        </Modal>
+      )}
+    </Page>
+  )
+}
+
+function BackLink() {
+  return (
+    <Link to="/policies" className="inline-flex items-center gap-1 text-sm text-muted hover:text-accent-strong">
+      <IconArrowLeft size={14} /> Policies
+    </Link>
   )
 }
 
@@ -312,22 +402,21 @@ function ApplyBar({
   onApply: () => void
 }) {
   return (
-    <div className="mt-3 flex gap-2">
-      <button
-        onClick={onValidate}
-        disabled={busy}
-        className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong disabled:opacity-50"
-      >
+    <div className="sticky bottom-0 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border border-edge bg-surface/95 px-4 py-3 shadow-card backdrop-blur">
+      <span className="mr-auto text-xs text-muted">
+        Validate runs a server-side dry-run; nothing changes on the cluster.
+      </span>
+      <Button onClick={onValidate} disabled={busy}>
         Validate (dry-run)
-      </button>
-      <button
+      </Button>
+      <Button
+        variant="primary"
         onClick={onApply}
         disabled={busy || denied}
         title={denied ? 'You are not allowed to update policies in this namespace' : undefined}
-        className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:brightness-110 disabled:opacity-50"
       >
         Apply
-      </button>
+      </Button>
     </div>
   )
 }
@@ -335,21 +424,11 @@ function ApplyBar({
 function ReviewChanges({ before, after }: { before: string; after: string }) {
   if (before === after) return null
   return (
-    <details className="mt-3" open>
-      <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-wide text-quiet hover:text-muted">
-        review changes
-      </summary>
-      <div className="mt-2">
+    <details className="group rounded-xl border border-edge bg-surface p-4 shadow-card" open>
+      <summary className="cursor-pointer text-sm font-semibold text-text">Review changes</summary>
+      <div className="mt-3">
         <DiffView before={before} after={after} onlyChanges />
       </div>
     </details>
-  )
-}
-
-function PageNote({ children, tone }: { children: React.ReactNode; tone?: 'error' }) {
-  return (
-    <div className="flex h-full items-center justify-center">
-      <p className={`text-sm ${tone === 'error' ? 'text-block' : 'text-muted'}`}>{children}</p>
-    </div>
   )
 }

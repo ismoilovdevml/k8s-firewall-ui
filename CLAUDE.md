@@ -38,7 +38,7 @@ Browser (React SPA) ── REST /api/v1 + SSE /api/v1/events ──▶ Go binary
 | `internal/lint` | `k8s-firewall-ui lint`: offline manifest checks + `--cluster` overlay (new findings, impact); text/json/github output |
 | `internal/cni` | heuristic CNI detection (kube-system DaemonSets + CRD discovery), `--cni-override` escape hatch |
 
-Frontend (`web/src/`): `api/` (fetch client, query keys, sse), `pages/` (Overview, Topology, Policies, PolicyDetail, PolicyNew, Simulator, Builder, Audit, Login), `components/` (`ui.tsx` primitives, AuthGate, ImpactPanel, ImportDialog), `policy/` (draft model, templates, diff), `hooks/useSSEInvalidation.ts`. State: TanStack Query + SSE invalidation; zustand only for the builder canvas.
+Frontend (`web/src/`): `api/` (fetch client, query keys, sse), `pages/` (Overview, Topology, Policies, PolicyDetail, PolicyNew, Simulator, Builder, Audit, Login), `components/` (`ui.tsx` primitives + `styles.ts` class helpers, `icons.tsx` inline SVG icons, `nav.tsx` sidebar groups, Layout, CommandPalette (Ctrl/⌘K), AuthGate, ImpactPanel, ImportDialog), `theme.ts` (light/dark/system; `public/theme-init.js` applies it before paint — CSP forbids inline scripts), `policy/` (draft model, templates, diff), `hooks/useSSEInvalidation.ts`. State: TanStack Query + SSE invalidation; zustand only for the builder canvas.
 
 ## Conventions
 
@@ -53,6 +53,7 @@ Frontend (`web/src/`): `api/` (fetch client, query keys, sse), `pages/` (Overvie
 - **Simulator changes require table-driven tests** (`internal/simulator/engine_test.go`, fixtures in `testdata/`). The simulator is the correctness core of this project.
 - Browser gets coarse SSE invalidation events only; all Kubernetes watching stays server-side in informers.
 - No new frontend state-management libraries.
+- Colors only via the theme tokens in `web/src/index.css` (every token has a dark-mode value); no raw Tailwind palette colors in components.
 
 ## NetworkPolicy semantics cheat-sheet
 

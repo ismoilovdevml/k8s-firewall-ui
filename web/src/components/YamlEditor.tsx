@@ -1,9 +1,13 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { yaml } from '@codemirror/lang-yaml'
+import { Prec } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
+import { useTheme } from '../theme'
 
-const theme = EditorView.theme(
-  {
+// Surface colors come from the theme tokens; the base light/dark theme only
+// supplies syntax colors, so the editor matches the page in both modes.
+const surface = Prec.highest(
+  EditorView.theme({
     '&': {
       backgroundColor: 'var(--color-surface)',
       color: 'var(--color-text)',
@@ -14,11 +18,10 @@ const theme = EditorView.theme(
       color: 'var(--color-quiet)',
       border: 'none',
     },
-    '.cm-activeLine': { backgroundColor: 'rgba(6, 55, 58, 0.05)' },
+    '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--color-accent) 6%, transparent)' },
     '.cm-activeLineGutter': { backgroundColor: 'transparent' },
     '&.cm-focused': { outline: 'none' },
-  },
-  { dark: false },
+  }),
 )
 
 interface Props {
@@ -28,15 +31,16 @@ interface Props {
 }
 
 export default function YamlEditor({ value, onChange, readOnly = false }: Props) {
+  const theme = useTheme()
   return (
     <CodeMirror
       value={value}
       onChange={onChange}
       readOnly={readOnly}
       theme={theme}
-      extensions={[yaml()]}
+      extensions={[yaml(), surface]}
       basicSetup={{ foldGutter: false, highlightActiveLine: !readOnly }}
-      className="overflow-hidden rounded-md border border-edge"
+      className="overflow-hidden rounded-lg border border-edge"
     />
   )
 }

@@ -5,6 +5,7 @@ import { useApplyAccess, usePlanAccess } from '../../api/queries'
 import type { AccessPlan, AccessSubject, FlowDirection, PlanRequest } from '../../api/types'
 import DiffView from '../DiffView'
 import { flowText } from './flow'
+import { IconAlertOctagon, IconShieldCheck } from '../icons'
 import { Badge, Button, Feedback, Modal } from '../ui'
 
 /**
@@ -52,9 +53,13 @@ export default function PlanDialog({ request, learn, onClose }: Source & { onClo
             <>
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 {p.verified ? (
-                  <Badge tone="ok">✓ verified by the simulator</Badge>
+                  <Badge tone="ok">
+                    <IconShieldCheck size={13} /> verified by the simulator
+                  </Badge>
                 ) : (
-                  <Badge tone="block">✕ cannot fully {action === 'learn' ? 'apply' : action} automatically</Badge>
+                  <Badge tone="block">
+                    <IconAlertOctagon size={13} /> cannot fully {action === 'learn' ? 'apply' : action} automatically
+                  </Badge>
                 )}
                 <span className="text-muted">
                   {p.changes.length} change{p.changes.length === 1 ? '' : 's'} ·{' '}
@@ -64,7 +69,7 @@ export default function PlanDialog({ request, learn, onClose }: Source & { onClo
               </div>
 
               {action === 'block' && (
-                <label className="flex items-center gap-2 text-sm text-text">
+                <label className="flex items-center gap-2 rounded-lg border border-edge p-3 text-sm text-text">
                   <input type="checkbox" checked={keepExternal} onChange={(e) => setKeepExternal(e.target.checked)} />
                   Keep internet access if this workload has to be isolated (0.0.0.0/0 except private ranges)
                 </label>
@@ -79,7 +84,7 @@ export default function PlanDialog({ request, learn, onClose }: Source & { onClo
               )}
 
               {p.blockers.length > 0 && (
-                <div className="rounded-lg border border-block/40 bg-block/5 p-3 text-sm">
+                <div className="rounded-lg border border-block/30 bg-block-soft p-3 text-sm">
                   <p className="font-semibold text-block">
                     These rules in hand-written policies still allow it — edit them to finish the block:
                   </p>
@@ -101,7 +106,7 @@ export default function PlanDialog({ request, learn, onClose }: Source & { onClo
 
               {p.changes.map((c) => (
                 <section key={`${c.namespace}/${c.name}`}>
-                  <h3 className="mb-1 flex items-center gap-2 text-sm">
+                  <h3 className="mb-2 flex flex-wrap items-center gap-2 text-sm">
                     <Badge tone={c.operation === 'create' ? 'ok' : 'info'}>{c.operation}</Badge>
                     <span className="font-mono text-text">
                       {c.namespace}/{c.name}
@@ -114,7 +119,9 @@ export default function PlanDialog({ request, learn, onClose }: Source & { onClo
 
               {p.impact.newlyBlocked.length + p.impact.newlyAllowed.length > 0 && (
                 <details className="text-sm">
-                  <summary className="cursor-pointer text-muted">Connections that change</summary>
+                  <summary className="cursor-pointer font-medium text-muted hover:text-text">
+                    Connections that change
+                  </summary>
                   <ul className="mt-1 max-h-40 overflow-auto font-mono text-xs">
                     {p.impact.newlyBlocked.map((e) => (
                       <li key={`b${e.source}${e.target}`} className="text-block">
@@ -132,10 +139,14 @@ export default function PlanDialog({ request, learn, onClose }: Source & { onClo
             </>
           )}
 
-          {stale && <Feedback tone="error">The cluster changed while you were reviewing. The plan above was refreshed — review it again.</Feedback>}
+          {stale && (
+            <Feedback tone="error">
+              The cluster changed while you were reviewing. The plan above was refreshed — review it again.
+            </Feedback>
+          )}
           {apply.isError && !stale && <Feedback tone="error">{errorMessage(apply.error)}</Feedback>}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 border-t border-edge pt-4">
             <Button variant="ghost" onClick={onClose}>
               Cancel
             </Button>
@@ -150,7 +161,9 @@ export default function PlanDialog({ request, learn, onClose }: Source & { onClo
                   )
                 }
               >
-                {apply.isPending ? 'Applying…' : `${verb} — apply ${p.changes.length} change${p.changes.length === 1 ? '' : 's'}`}
+                {apply.isPending
+                  ? 'Applying…'
+                  : `${verb} — apply ${p.changes.length} change${p.changes.length === 1 ? '' : 's'}`}
               </Button>
             )}
           </div>
@@ -160,9 +173,8 @@ export default function PlanDialog({ request, learn, onClose }: Source & { onClo
       {done && (
         <div className="space-y-3">
           <Feedback tone="ok">
-            Applied:{' '}
-            {apply.data!.results.map((r) => `${r.operation} ${r.namespace}/${r.name}`).join(', ')}. The table updates
-            automatically.
+            Applied: {apply.data!.results.map((r) => `${r.operation} ${r.namespace}/${r.name}`).join(', ')}. The table
+            updates automatically.
           </Feedback>
           <div className="flex justify-end">
             <Button variant="primary" onClick={onClose}>

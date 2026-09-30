@@ -15,6 +15,9 @@ import LabelMapEditor from '../components/policy-form/LabelMapEditor'
 import PeerEditor from '../components/policy-form/PeerEditor'
 import PortListEditor from '../components/policy-form/PortListEditor'
 import { PeerNode, TargetNode } from '../components/builder/nodes'
+import { Button, Checkbox, Feedback, Field, Input, Select } from '../components/ui'
+import { IconArrowLeft, IconPlus, IconTrash } from '../components/icons'
+import { useTheme } from '../theme'
 
 const nodeTypes = { target: TargetNode, peer: PeerNode }
 
@@ -23,11 +26,10 @@ export default function BuilderPage() {
   const navigate = useNavigate()
   const { data: namespaces } = useNamespaces()
   const create = useCreatePolicy()
+  const theme = useTheme()
   const [feedback, setFeedback] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
 
-  const userNamespaces = (namespaces ?? [])
-    .map((ns) => ns.name)
-    .filter((n) => !n.startsWith('kube-'))
+  const userNamespaces = (namespaces ?? []).map((ns) => ns.name).filter((n) => !n.startsWith('kube-'))
 
   useEffect(() => {
     if (store.namespace === '' && userNamespaces.length > 0) {
@@ -86,15 +88,15 @@ export default function BuilderPage() {
         id: `e-${card.id}`,
         source: card.id,
         target: '__target__',
-        style: { stroke: 'var(--color-allow)' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--color-allow)' },
+        style: { stroke: 'var(--color-info)', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--color-info)' },
       })),
       ...egress.map((card) => ({
         id: `e-${card.id}`,
         source: '__target__',
         target: card.id,
-        style: { stroke: 'var(--color-accent-strong)' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--color-accent-strong)' },
+        style: { stroke: 'var(--color-accent)', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--color-accent)' },
       })),
     ]
     return { nodes: ns, edges: es }
@@ -110,8 +112,7 @@ export default function BuilderPage() {
           if (dryRun) setFeedback({ tone: 'ok', text: 'Valid — the API server accepts this policy.' })
           else navigate(`/policies/${draft.namespace}/${draft.name}`)
         },
-        onError: (err) =>
-          setFeedback({ tone: 'error', text: err instanceof ApiError ? err.message : String(err) }),
+        onError: (err) => setFeedback({ tone: 'error', text: err instanceof ApiError ? err.message : String(err) }),
       },
     )
   }
@@ -119,69 +120,54 @@ export default function BuilderPage() {
   const ready = store.name.trim() !== '' && store.namespace !== ''
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col lg:flex-row">
       {/* left: canvas and top controls */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-wrap items-end gap-3 border-b border-edge px-4 py-3">
-          <label className="block">
-            <span className="mb-1 block font-mono text-[10px] uppercase tracking-wide text-quiet">name</span>
-            <input
+      <div className="flex min-h-[420px] min-w-0 flex-1 flex-col">
+        <div className="flex flex-wrap items-end gap-3 border-b border-edge bg-surface px-4 py-3">
+          <Field label="Policy name">
+            <Input
+              mono
               value={store.name}
               onChange={(e) => store.set({ name: e.target.value })}
               placeholder="allow-web-to-db"
-              className="w-48 rounded border border-edge bg-surface px-2 py-1.5 font-mono text-sm text-text placeholder:text-quiet focus:border-accent focus:outline-none"
+              className="w-52"
             />
-          </label>
-          <label className="block">
-            <span className="mb-1 block font-mono text-[10px] uppercase tracking-wide text-quiet">namespace</span>
-            <select
-              value={store.namespace}
-              onChange={(e) => store.set({ namespace: e.target.value })}
-              className="rounded border border-edge bg-surface px-2 py-1.5 font-mono text-sm text-text focus:border-accent focus:outline-none"
-            >
+          </Field>
+          <Field label="Namespace">
+            <Select mono value={store.namespace} onChange={(e) => store.set({ namespace: e.target.value })}>
               {userNamespaces.map((ns) => (
                 <option key={ns}>{ns}</option>
               ))}
-            </select>
-          </label>
+            </Select>
+          </Field>
           <LoadExisting />
-          <div className="ml-auto flex gap-2">
-            <button
-              onClick={() => store.addPeer('ingress')}
-              className="rounded border border-allow/50 px-3 py-1.5 text-sm text-accent-strong hover:bg-allow/10"
-            >
-              + Allow from…
-            </button>
-            <button
+          <div className="ml-auto flex flex-wrap gap-2">
+            <Button onClick={() => store.addPeer('ingress')} icon={<IconPlus size={15} className="text-info" />}>
+              Allow from…
+            </Button>
+            <Button
               onClick={() => store.addPeer('egress')}
-              className="rounded border border-accent-strong/50 px-3 py-1.5 text-sm text-accent-strong hover:bg-accent-strong/10"
+              icon={<IconPlus size={15} className="text-accent-strong" />}
             >
-              + Allow to…
-            </button>
-            <button
-              onClick={() => submit(true)}
-              disabled={!ready || create.isPending}
-              className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong disabled:opacity-50"
-            >
+              Allow to…
+            </Button>
+            <span className="mx-1 hidden w-px bg-edge sm:block" />
+            <Button onClick={() => submit(true)} disabled={!ready || create.isPending}>
               Validate
-            </button>
-            <button
-              onClick={() => submit(false)}
-              disabled={!ready || create.isPending}
-              className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:brightness-110 disabled:opacity-50"
-            >
+            </Button>
+            <Button variant="primary" onClick={() => submit(false)} disabled={!ready || create.isPending}>
               Create
-            </button>
+            </Button>
           </div>
         </div>
 
         {feedback && (
-          <p className={`px-4 pt-2 font-mono text-xs ${feedback.tone === 'ok' ? 'text-accent-strong' : 'text-block'}`}>
-            {feedback.text}
-          </p>
+          <div className="px-4">
+            <Feedback tone={feedback.tone}>{feedback.text}</Feedback>
+          </div>
         )}
 
-        <div className="min-h-0 flex-1">
+        <div className="relative min-h-0 flex-1">
           <ReactFlow
             key={store.peers.length /* refit when cards are added/removed */}
             nodes={nodes}
@@ -190,32 +176,59 @@ export default function BuilderPage() {
             onNodeClick={(_, node) => node.id !== '__target__' && store.select(node.id)}
             onPaneClick={() => store.select(null)}
             fitView
+            fitViewOptions={{ maxZoom: 1.1 }}
             proOptions={{ hideAttribution: true }}
-            colorMode="light"
+            colorMode={theme}
             nodesDraggable={false}
             nodesConnectable={false}
           >
-            <Background color="var(--color-edge)" gap={24} />
+            <Background color="var(--color-edge-strong)" gap={24} />
           </ReactFlow>
+          {store.peers.length === 0 && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center px-4">
+              <div className="max-w-md rounded-xl border border-edge bg-surface/95 px-4 py-3 text-center text-sm text-muted shadow-card">
+                <span className="font-medium text-text">Start drawing:</span> use <strong>Allow from…</strong> for
+                incoming traffic and <strong>Allow to…</strong> for outgoing. Click any card to edit it.
+              </div>
+            </div>
+          )}
+          <div className="pointer-events-none absolute left-4 top-4 flex gap-3 rounded-lg border border-edge bg-surface/90 px-3 py-1.5 text-xs text-muted shadow-sm">
+            <span className="flex items-center gap-1.5">
+              <span className="h-0.5 w-4 rounded bg-info" /> ingress
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-0.5 w-4 rounded bg-accent" /> egress
+            </span>
+          </div>
         </div>
       </div>
 
       {/* right: inspector + YAML preview */}
-      <aside className="flex w-96 shrink-0 flex-col border-l border-edge bg-surface">
+      <aside className="flex w-full shrink-0 flex-col border-t border-edge bg-surface lg:w-[400px] lg:border-l lg:border-t-0">
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {selected ? (
             <div>
               <div className="flex items-center justify-between">
-                <h2 className="font-mono text-[11px] uppercase tracking-wide text-quiet">
-                  {selected.direction === 'ingress' ? 'allow from' : 'allow to'}
-                </h2>
                 <button
+                  type="button"
+                  onClick={() => store.select(null)}
+                  className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent-strong"
+                >
+                  <IconArrowLeft size={13} /> Policy target
+                </button>
+                <Button
+                  size="xs"
+                  variant="ghost"
                   onClick={() => store.removePeer(selected.id)}
-                  className="text-xs text-quiet hover:text-block"
+                  icon={<IconTrash size={13} />}
+                  className="hover:bg-block-soft hover:text-block"
                 >
                   Remove
-                </button>
+                </Button>
               </div>
+              <h2 className="mt-2 text-sm font-semibold text-text">
+                {selected.direction === 'ingress' ? 'Allow traffic from' : 'Allow traffic to'}
+              </h2>
               <div className="mt-2">
                 <PeerEditor
                   value={selected.peer}
@@ -223,47 +236,37 @@ export default function BuilderPage() {
                   onRemove={() => store.removePeer(selected.id)}
                 />
               </div>
-              <div className="mt-3">
-                <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-quiet">ports</div>
-                <PortListEditor
-                  value={selected.ports}
-                  onChange={(ports) => store.updatePeer(selected.id, { ports })}
-                />
+              <div className="mt-4">
+                <div className="mb-2 text-xs font-medium text-muted">Ports</div>
+                <PortListEditor value={selected.ports} onChange={(ports) => store.updatePeer(selected.id, { ports })} />
               </div>
             </div>
           ) : (
             <div>
-              <h2 className="font-mono text-[11px] uppercase tracking-wide text-quiet">policy target</h2>
-              <p className="mt-1 text-xs text-muted">
+              <h2 className="text-sm font-semibold text-text">Policy target</h2>
+              <p className="mt-0.5 text-xs text-muted">
                 Which pods this policy applies to. Click a card on the canvas to edit it.
               </p>
-              <div className="mt-2">
+              <div className="mt-3">
                 <LabelMapEditor
                   value={store.podSelector}
                   onChange={(podSelector) => store.set({ podSelector })}
                   emptyHint="no labels — applies to EVERY pod in the namespace"
                 />
               </div>
-              <div className="mt-4 space-y-1.5">
+              <div className="mt-4 space-y-2 rounded-lg border border-edge p-3">
                 {(['ingress', 'egress'] as const).map((dir) => (
-                  <label key={dir} className="flex items-center gap-2 text-sm text-text">
-                    <input
-                      type="checkbox"
-                      checked={dir === 'ingress' ? store.ingressEnabled : store.egressEnabled}
-                      onChange={(e) =>
-                        store.set(
-                          dir === 'ingress'
-                            ? { ingressEnabled: e.target.checked }
-                            : { egressEnabled: e.target.checked },
-                        )
-                      }
-                      className="accent-(--color-accent)"
-                    />
-                    isolate {dir}
-                    <span className="text-xs text-quiet">
-                      {dir === 'ingress' ? '(deny incoming unless allowed)' : '(deny outgoing unless allowed)'}
-                    </span>
-                  </label>
+                  <Checkbox
+                    key={dir}
+                    checked={dir === 'ingress' ? store.ingressEnabled : store.egressEnabled}
+                    onChange={(e) =>
+                      store.set(
+                        dir === 'ingress' ? { ingressEnabled: e.target.checked } : { egressEnabled: e.target.checked },
+                      )
+                    }
+                    label={`Isolate ${dir}`}
+                    hint={dir === 'ingress' ? 'deny incoming unless allowed' : 'deny outgoing unless allowed'}
+                  />
                 ))}
               </div>
             </div>
@@ -274,14 +277,12 @@ export default function BuilderPage() {
             request={draft.name && draft.namespace ? { operation: 'apply', namespace: draft.namespace, policy } : null}
           />
         </div>
-        <div className="border-t border-edge p-3">
-          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-wide text-quiet">
-            live yaml
-          </div>
-          <div className="max-h-72 overflow-y-auto">
+        <details className="border-t border-edge p-3" open>
+          <summary className="cursor-pointer text-xs font-medium text-muted hover:text-text">Live YAML</summary>
+          <div className="mt-2 max-h-72 overflow-y-auto">
             <YamlEditor value={yamlPreview} readOnly />
           </div>
-        </div>
+        </details>
       </aside>
     </div>
   )
@@ -308,23 +309,15 @@ function LoadExisting() {
   }, [detail.data, pick])
 
   return (
-    <label className="block">
-      <span className="mb-1 block font-mono text-[10px] uppercase tracking-wide text-quiet">
-        load existing
-      </span>
-      <select
-        value={pick}
-        onChange={(e) => setPick(e.target.value)}
-        className="max-w-56 rounded border border-edge bg-surface px-2 py-1.5 font-mono text-xs text-text focus:border-accent focus:outline-none"
-      >
+    <Field label="Load existing" hint={notice ? <span className="text-warn-text">{notice}</span> : undefined}>
+      <Select mono value={pick} onChange={(e) => setPick(e.target.value)} className="max-w-60">
         <option value="">choose policy…</option>
         {(policies ?? []).map((p) => (
           <option key={`${p.namespace}/${p.name}`} value={`${p.namespace}/${p.name}`}>
             {p.namespace}/{p.name}
           </option>
         ))}
-      </select>
-      {notice && <span className="ml-2 font-mono text-[10px] text-warn-text">{notice}</span>}
-    </label>
+      </Select>
+    </Field>
   )
 }

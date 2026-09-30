@@ -1,4 +1,6 @@
 import type { PolicyDraft, RuleDraft } from '../../policy/model'
+import { IconArrowRight, IconPlus } from '../icons'
+import { Button, Card, Field, Input, Select } from '../ui'
 import LabelMapEditor from './LabelMapEditor'
 import RuleEditor from './RuleEditor'
 
@@ -11,15 +13,15 @@ interface Props {
 }
 
 export default function PolicyForm({ value, onChange, identityLocked, namespaces }: Props) {
-  const setRules = (direction: 'ingress' | 'egress', rules: RuleDraft[]) =>
-    onChange({ ...value, [direction]: rules })
+  const setRules = (direction: 'ingress' | 'egress', rules: RuleDraft[]) => onChange({ ...value, [direction]: rules })
 
   const ruleSection = (direction: 'ingress' | 'egress') => {
     const enabled = direction === 'ingress' ? value.ingressEnabled : value.egressEnabled
     const rules = value[direction]
+    const word = direction === 'ingress' ? 'incoming' : 'outgoing'
     return (
-      <section className="rounded-md border border-edge bg-surface p-4">
-        <label className="flex items-center gap-2">
+      <Card>
+        <label className="flex cursor-pointer items-start gap-3">
           <input
             type="checkbox"
             checked={enabled}
@@ -29,93 +31,97 @@ export default function PolicyForm({ value, onChange, identityLocked, namespaces
                 [direction === 'ingress' ? 'ingressEnabled' : 'egressEnabled']: e.target.checked,
               })
             }
-            className="accent-(--color-accent)"
+            className="mt-1 h-4 w-4"
           />
-          <span className="font-mono text-sm font-semibold text-text">
-            {direction === 'ingress' ? 'Ingress' : 'Egress'}
+          <span className="min-w-0">
+            <span className="flex items-center gap-2 text-sm font-semibold text-text">
+              <IconArrowRight size={15} className={direction === 'ingress' ? 'text-info' : 'text-accent-strong'} />
+              {direction === 'ingress' ? 'Ingress — incoming traffic' : 'Egress — outgoing traffic'}
+            </span>
+            <span className="mt-0.5 block text-xs text-muted">
+              {enabled
+                ? rules.length === 0
+                  ? `Isolates the selected pods: ALL ${word} traffic is denied. Add rules to allow specific traffic.`
+                  : `${direction === 'ingress' ? 'Incoming' : 'Outgoing'} traffic is denied unless a rule below allows it.`
+                : `This policy does not restrict ${word} traffic.`}
+            </span>
           </span>
         </label>
-        <p className="mt-1 text-xs text-muted">
-          {enabled
-            ? rules.length === 0
-              ? `Isolates the selected pods: ALL ${direction === 'ingress' ? 'incoming' : 'outgoing'} traffic is denied. Add rules to allow specific traffic.`
-              : `${direction === 'ingress' ? 'Incoming' : 'Outgoing'} traffic is denied unless a rule below allows it.`
-            : `This policy does not restrict ${direction === 'ingress' ? 'incoming' : 'outgoing'} traffic.`}
-        </p>
         {enabled && (
-          <div className="mt-3 space-y-2">
+          <div className="mt-4 space-y-3">
             {rules.map((rule, i) => (
               <RuleEditor
                 key={i}
+                index={i}
                 value={rule}
                 direction={direction}
-                onChange={(r) => setRules(direction, rules.map((x, j) => (j === i ? r : x)))}
-                onRemove={() => setRules(direction, rules.filter((_, j) => j !== i))}
+                onChange={(r) =>
+                  setRules(
+                    direction,
+                    rules.map((x, j) => (j === i ? r : x)),
+                  )
+                }
+                onRemove={() =>
+                  setRules(
+                    direction,
+                    rules.filter((_, j) => j !== i),
+                  )
+                }
               />
             ))}
-            <button
-              type="button"
+            <Button
+              size="sm"
               onClick={() => setRules(direction, [...rules, { peers: [], ports: [] }])}
-              className="rounded border border-edge px-3 py-1.5 text-xs text-muted hover:border-accent hover:text-accent-strong"
+              icon={<IconPlus size={14} />}
             >
               Add {direction} rule
-            </button>
+            </Button>
           </div>
         )}
-      </section>
+      </Card>
     )
   }
 
   return (
     <div className="space-y-4">
-      <section className="rounded-md border border-edge bg-surface p-4">
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1 block font-mono text-[10px] uppercase tracking-wide text-quiet">
-              name
-            </span>
-            <input
+      <Card title="Basics" description="Name the policy and choose which pods it applies to.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Name">
+            <Input
+              mono
               value={value.name}
               onChange={(e) => onChange({ ...value, name: e.target.value })}
               disabled={identityLocked}
               placeholder="allow-web-to-db"
-              className="w-full rounded border border-edge bg-base px-2 py-1.5 font-mono text-sm text-text placeholder:text-quiet focus:border-accent focus:outline-none disabled:opacity-50"
+              className="w-full"
             />
-          </label>
-          <label className="block">
-            <span className="mb-1 block font-mono text-[10px] uppercase tracking-wide text-quiet">
-              namespace
-            </span>
+          </Field>
+          <Field label="Namespace">
             {identityLocked || !namespaces ? (
-              <input
-                value={value.namespace}
-                disabled
-                className="w-full rounded border border-edge bg-base px-2 py-1.5 font-mono text-sm text-text opacity-50"
-              />
+              <Input mono value={value.namespace} disabled className="w-full" />
             ) : (
-              <select
+              <Select
+                mono
                 value={value.namespace}
                 onChange={(e) => onChange({ ...value, namespace: e.target.value })}
-                className="w-full rounded border border-edge bg-base px-2 py-1.5 font-mono text-sm text-text focus:border-accent focus:outline-none"
+                className="w-full"
               >
                 {namespaces.map((ns) => (
                   <option key={ns}>{ns}</option>
                 ))}
-              </select>
+              </Select>
             )}
-          </label>
+          </Field>
         </div>
-        <div className="mt-3">
-          <span className="mb-1 block font-mono text-[10px] uppercase tracking-wide text-quiet">
-            applies to pods
-          </span>
+        <div className="mt-4">
+          <span className="mb-1.5 block text-xs font-medium text-muted">Applies to pods with labels</span>
           <LabelMapEditor
             value={value.podSelector}
             onChange={(podSelector) => onChange({ ...value, podSelector })}
             emptyHint="no labels — applies to EVERY pod in the namespace"
           />
         </div>
-      </section>
+      </Card>
 
       {ruleSection('ingress')}
       {ruleSection('egress')}

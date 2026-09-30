@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useCreatePolicy, useNamespaces, usePermissions } from '../api/queries'
 import { errorMessage } from '../api/client'
@@ -7,7 +8,8 @@ import type { PolicyDraft } from '../policy/model'
 import { TEMPLATES, findTemplate } from '../policy/templates'
 import PolicyForm from '../components/policy-form/PolicyForm'
 import ImpactPanel from '../components/ImpactPanel'
-import { Button, Feedback, PageHeader } from '../components/ui'
+import { Alert, Button, Feedback, Page, PageHeader } from '../components/ui'
+import { IconArrowLeft, IconCheck, IconPlus } from '../components/icons'
 
 export default function PolicyNewPage() {
   const navigate = useNavigate()
@@ -61,45 +63,74 @@ export default function PolicyNewPage() {
   const template = findTemplate(templateId)
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <Link to="/policies" className="font-mono text-xs text-quiet hover:text-accent-strong">
-        ← policies
-      </Link>
-      <div className="mt-1">
-        <PageHeader
-          title="New NetworkPolicy"
-          subtitle="Start from a proven pattern or a blank policy. Validate with a server-side dry-run and preview the impact before creating."
-        />
-      </div>
+    <Page>
+      <PageHeader
+        back={
+          <Link to="/policies" className="inline-flex items-center gap-1 text-sm text-muted hover:text-accent-strong">
+            <IconArrowLeft size={14} /> Policies
+          </Link>
+        }
+        icon={<IconPlus size={20} />}
+        title="New NetworkPolicy"
+        subtitle="Start from a proven pattern or a blank policy. Validate with a server-side dry-run and preview the impact before creating."
+      />
 
-      <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
-        <TemplateCard active={templateId === 'blank'} title="Blank" description="An empty ingress policy." onClick={() => applyTemplate('blank')} />
-        {TEMPLATES.map((t) => (
+      <Step n={1} title="Choose a starting point">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
           <TemplateCard
-            key={t.id}
-            active={templateId === t.id}
-            title={t.title}
-            description={t.description}
-            onClick={() => applyTemplate(t.id)}
+            active={templateId === 'blank'}
+            title="Blank"
+            description="An empty ingress policy."
+            onClick={() => applyTemplate('blank')}
           />
-        ))}
-      </div>
-      {template?.caution && (
-        <div className="mt-3 rounded-lg border border-warn bg-warn-bg/60 px-3 py-2 text-sm text-warn-text">
-          ⚠ {template.caution} Review the impact preview before creating.
+          {TEMPLATES.map((t) => (
+            <TemplateCard
+              key={t.id}
+              active={templateId === t.id}
+              title={t.title}
+              description={t.description}
+              onClick={() => applyTemplate(t.id)}
+            />
+          ))}
         </div>
-      )}
+        {template?.caution && (
+          <Alert tone="warn" className="mt-3">
+            {template.caution} Review the impact preview before creating.
+          </Alert>
+        )}
+      </Step>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[3fr_2fr]">
-        <div>
-          <PolicyForm value={draft} onChange={setDraft} namespaces={userNamespaces} />
+      <Step n={2} title="Adjust the rules">
+        <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+          <div>
+            <PolicyForm value={draft} onChange={setDraft} namespaces={userNamespaces} />
+          </div>
+          <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+            <ImpactPanel request={ready ? { operation: 'apply', namespace: draft.namespace, policy } : null} />
+          </div>
+        </div>
+      </Step>
+
+      <Step n={3} title="Validate and create">
+        <div className="rounded-xl border border-edge bg-surface p-4 shadow-card">
           {denied && (
-            <p className="mt-3 text-sm text-block">
+            <Alert tone="block" className="mb-3">
               Your account is not allowed to create NetworkPolicies in “{draft.namespace}”.
-            </p>
+            </Alert>
           )}
-          {feedback && <Feedback tone={feedback.tone}>{feedback.text}</Feedback>}
-          <div className="mt-4 flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-auto text-sm text-muted">
+              {ready ? (
+                <>
+                  Creates{' '}
+                  <span className="font-mono text-text">
+                    {draft.namespace}/{draft.name}
+                  </span>
+                </>
+              ) : (
+                'Give the policy a name to continue.'
+              )}
+            </span>
             <Button onClick={() => submit(true)} disabled={!ready || create.isPending}>
               Validate (dry-run)
             </Button>
@@ -107,12 +138,24 @@ export default function PolicyNewPage() {
               Create policy
             </Button>
           </div>
+          {feedback && <Feedback tone={feedback.tone}>{feedback.text}</Feedback>}
         </div>
-        <div className="space-y-4">
-          <ImpactPanel request={ready ? { operation: 'apply', namespace: draft.namespace, policy } : null} />
-        </div>
-      </div>
-    </div>
+      </Step>
+    </Page>
+  )
+}
+
+function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+  return (
+    <section>
+      <h2 className="mb-3 flex items-center gap-2.5 text-sm font-semibold text-text">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-on-accent">
+          {n}
+        </span>
+        {title}
+      </h2>
+      {children}
+    </section>
   )
 }
 
@@ -131,14 +174,21 @@ function TemplateCard({
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-lg border p-3 text-left transition ${
-        active ? 'border-accent bg-accent/5 ring-1 ring-accent' : 'border-edge bg-surface hover:border-accent/60'
+      className={`relative flex flex-col justify-start rounded-xl border p-4 text-left transition-all ${
+        active
+          ? 'border-accent bg-accent-soft ring-1 ring-accent'
+          : 'border-edge bg-surface shadow-card hover:border-edge-strong hover:shadow-pop'
       }`}
     >
-      <div className="flex items-center justify-between gap-1">
+      <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-semibold text-text">{title}</span>
+        {active && (
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent">
+            <IconCheck size={12} />
+          </span>
+        )}
       </div>
-      <p className="mt-1 line-clamp-3 text-xs text-muted">{description}</p>
+      <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted">{description}</p>
     </button>
   )
 }

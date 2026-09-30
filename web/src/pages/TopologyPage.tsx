@@ -10,6 +10,10 @@ import WorkloadNode from '../components/topology/WorkloadNode'
 import NamespaceGraph from '../components/topology/NamespaceGraph'
 import { layoutCircle } from '../components/topology/layout'
 import FloatingEdge from '../components/topology/FloatingEdge'
+import { GraphHint, GraphPanel, LegendToggle } from '../components/topology/controls'
+import { IconBox, IconLayers } from '../components/icons'
+import { Badge, Segmented } from '../components/ui'
+import { useTheme } from '../theme'
 
 const nodeTypes = { workload: WorkloadNode }
 const edgeTypes = { floating: FloatingEdge }
@@ -32,19 +36,37 @@ export default function TopologyPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-1 border-b border-edge px-4 pt-2">
-        {(['namespaces', 'workloads'] as const).map((v) => (
-          <button
-            key={v}
-            onClick={() => setView(v)}
-            aria-pressed={view === v}
-            className={`px-3 py-2 font-mono text-xs ${
-              view === v ? 'border-b-2 border-accent text-accent-strong' : 'text-muted hover:text-text'
-            }`}
-          >
-            {v === 'namespaces' ? 'Namespaces' : 'Workloads'}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-3 border-b border-edge bg-surface px-4 py-3">
+        <Segmented
+          label="Topology level"
+          value={view}
+          onChange={setView}
+          options={[
+            {
+              id: 'namespaces',
+              label: (
+                <>
+                  <IconLayers size={14} />
+                  Namespaces
+                </>
+              ),
+            },
+            {
+              id: 'workloads',
+              label: (
+                <>
+                  <IconBox size={14} />
+                  Workloads
+                </>
+              ),
+            },
+          ]}
+        />
+        <p className="text-sm text-muted">
+          {view === 'namespaces'
+            ? 'Which teams can reach which: one node per namespace, lines summarize every workload pair.'
+            : 'Workload-to-workload reachability under the current policies. Click a workload to open its firewall.'}
+        </p>
       </div>
       <div className="min-h-0 flex-1">
         {view === 'namespaces' ? (
@@ -75,6 +97,7 @@ function WorkloadTopology({
   const [observedOnly, setObservedOnly] = useState(false)
 
   const topology = useTopology(selected)
+  const theme = useTheme()
 
   const { nodes, edges } = useMemo(() => {
     if (!topology.data) return { nodes: [] as Node[], edges: [] as Edge[] }
@@ -92,7 +115,11 @@ function WorkloadTopology({
         source: e.source,
         target: e.target,
         // Observed traffic is drawn heavier than what policy merely permits.
-        style: { stroke: style.stroke, strokeDasharray: e.observed ? undefined : style.dash, strokeWidth: e.observed ? 3.5 : 1.5 },
+        style: {
+          stroke: style.stroke,
+          strokeDasharray: e.observed ? undefined : style.dash,
+          strokeWidth: e.observed ? 3.5 : 1.5,
+        },
         markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
         data: { edge: e },
       }
@@ -118,8 +145,7 @@ function WorkloadTopology({
     return c
   }, [topology.data])
 
-  const toggle = (ns: string) =>
-    setSelected((cur) => (cur.includes(ns) ? cur.filter((n) => n !== ns) : [...cur, ns]))
+  const toggle = (ns: string) => setSelected((cur) => (cur.includes(ns) ? cur.filter((n) => n !== ns) : [...cur, ns]))
 
   const userNamespaces = (namespaces ?? []).filter(
     (ns) => !ns.name.startsWith('kube-') && ns.name !== 'local-path-storage' && ns.podCount > 0,
@@ -127,75 +153,65 @@ function WorkloadTopology({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-edge px-4 py-3">
+      <div className="space-y-2.5 border-b border-edge bg-surface px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-xs uppercase tracking-wide text-quiet">namespaces</span>
+          <span className="mr-1 text-xs font-medium text-muted">Namespaces</span>
           {userNamespaces.map((ns) => (
             <button
               key={ns.name}
               onClick={() => toggle(ns.name)}
-              className={`rounded-full border px-3 py-0.5 font-mono text-xs transition-colors ${
+              aria-pressed={selected.includes(ns.name)}
+              className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-3 font-mono text-xs transition-colors ${
                 selected.includes(ns.name)
-                  ? 'border-accent/60 bg-accent/10 text-accent-strong'
-                  : 'border-edge text-muted hover:border-quiet hover:text-text'
+                  ? 'border-accent bg-accent-soft text-accent-strong'
+                  : 'border-edge bg-surface text-muted hover:border-edge-strong hover:text-text'
               }`}
             >
               {ns.name}
-              <span className="ml-1.5 text-quiet">{ns.podCount}</span>
+              <span className="text-quiet">{ns.podCount}</span>
             </button>
           ))}
           {namespaces && userNamespaces.length === 0 && (
             <span className="text-sm text-muted">No user namespaces with pods yet.</span>
           )}
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-xs text-muted">
-          <span className="uppercase tracking-wide text-quiet">show</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs font-medium text-muted">Show</span>
           {(Object.keys(VERDICT_STYLE) as EdgeVerdict[]).map((v) => (
-            <button
+            <LegendToggle
               key={v}
-              aria-pressed={visible[v]}
-              onClick={() => setVisible((cur) => ({ ...cur, [v]: !cur[v] }))}
+              label={v === 'unconstrained' ? 'no policy' : v}
+              count={topology.data ? counts[v] : undefined}
+              stroke={VERDICT_STYLE[v].stroke}
+              dash={VERDICT_STYLE[v].dash}
+              pressed={visible[v]}
               title={VERDICT_STYLE[v].label}
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 transition ${
-                visible[v] ? 'border-edge bg-surface text-text' : 'border-transparent text-quiet line-through opacity-60'
-              }`}
-            >
-              <svg width="24" height="6">
-                <line
-                  x1="0"
-                  y1="3"
-                  x2="24"
-                  y2="3"
-                  stroke={VERDICT_STYLE[v].stroke}
-                  strokeWidth="2"
-                  strokeDasharray={VERDICT_STYLE[v].dash}
-                />
-              </svg>
-              {v}
-              {topology.data && <span className="text-quiet">{counts[v]}</span>}
-            </button>
+              onClick={() => setVisible((cur) => ({ ...cur, [v]: !cur[v] }))}
+            />
           ))}
           {topology.data?.flowsEnabled && (
             <>
-              <span className="mx-1 h-4 w-px bg-edge" />
+              <span className="mx-1 h-5 w-px bg-edge" />
               <button
                 aria-pressed={observedOnly}
                 onClick={() => setObservedOnly((cur) => !cur)}
                 title="Only connections the node agents actually saw (thick lines)"
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 transition ${
-                  observedOnly ? 'border-accent/60 bg-accent/10 text-accent-strong' : 'border-edge bg-surface text-text'
+                className={`inline-flex h-7 items-center gap-2 rounded-full border px-3 text-xs font-medium transition-colors ${
+                  observedOnly ? 'border-accent bg-accent-soft text-accent-strong' : 'border-edge bg-surface text-text'
                 }`}
               >
-                <svg width="24" height="6">
-                  <line x1="0" y1="3" x2="24" y2="3" stroke="currentColor" strokeWidth="3.5" />
+                <svg width="22" height="6" aria-hidden>
+                  <line x1="0" y1="3" x2="22" y2="3" stroke="currentColor" strokeWidth="3.5" />
                 </svg>
                 observed only
                 <span className="text-quiet">{observedCount}</span>
               </button>
               {observedBlocked > 0 && (
-                <span className="rounded-full bg-block/10 px-2.5 py-0.5 text-block" data-observed-blocked>
-                  {observedBlocked} observed connection{observedBlocked === 1 ? '' : 's'} now blocked
-                </span>
+                <Badge tone="block">
+                  <span data-observed-blocked>
+                    {observedBlocked} observed connection{observedBlocked === 1 ? '' : 's'} now blocked
+                  </span>
+                </Badge>
               )}
             </>
           )}
@@ -203,18 +219,16 @@ function WorkloadTopology({
       </div>
 
       <div className="relative min-h-0 flex-1">
-        {selected.length === 0 && (
-          <EmptyHint>Select one or more namespaces above to map their traffic.</EmptyHint>
-        )}
+        {selected.length === 0 && <GraphHint>Select one or more namespaces above to map their traffic.</GraphHint>}
         {topology.error instanceof ApiError && (
-          <EmptyHint tone="error">
+          <GraphHint tone="error">
             {topology.error.code === 'TOO_MANY_WORKLOADS'
               ? topology.error.message
               : `Could not compute the topology: ${topology.error.message}`}
-          </EmptyHint>
+          </GraphHint>
         )}
         {topology.data && topology.data.nodes.length === 0 && (
-          <EmptyHint>No running workloads in this selection.</EmptyHint>
+          <GraphHint>No running workloads in this selection.</GraphHint>
         )}
         {nodes.length > 0 && (
           <ReactFlow
@@ -224,42 +238,32 @@ function WorkloadTopology({
             edgeTypes={edgeTypes}
             onNodeClick={(_, node) => {
               const info = (node.data as { info: { namespace: string; workload: string } }).info
-              navigate(`/firewall?namespace=${encodeURIComponent(info.namespace)}&workload=${encodeURIComponent(info.workload)}`)
+              navigate(
+                `/firewall?namespace=${encodeURIComponent(info.namespace)}&workload=${encodeURIComponent(info.workload)}`,
+              )
             }}
             onEdgeClick={(_, edge) => setActiveEdge((edge.data as { edge: TopologyEdge }).edge)}
             onPaneClick={() => setActiveEdge(null)}
             fitView
             proOptions={{ hideAttribution: true }}
-            colorMode="light"
+            colorMode={theme}
           >
-            <Background color="var(--color-edge)" gap={24} />
+            <Background color="var(--color-edge-strong)" gap={24} />
             <Controls showInteractive={false} />
           </ReactFlow>
         )}
 
         {activeEdge && (
-          <div className="absolute right-4 top-4 w-80 rounded-md border border-edge bg-surface p-4 shadow-lg">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 font-mono text-xs text-muted">
-                <div className="truncate">{activeEdge.source.split('/').slice(1).join('/')}</div>
-                <div className="text-quiet">→ {activeEdge.target.split('/').slice(1).join('/')}</div>
-              </div>
-              <button
-                onClick={() => setActiveEdge(null)}
-                className="text-quiet hover:text-text"
-                aria-label="Close"
-              >
-                ✕
-              </button>
+          <GraphPanel onClose={() => setActiveEdge(null)}>
+            <div className="min-w-0 pr-8 font-mono text-xs text-muted">
+              <div className="truncate text-text">{activeEdge.source.split('/').slice(1).join('/')}</div>
+              <div className="truncate">→ {activeEdge.target.split('/').slice(1).join('/')}</div>
             </div>
-            <div
-              className="mt-2 font-mono text-sm font-semibold"
-              style={{ color: VERDICT_STYLE[activeEdge.verdict].stroke }}
-            >
+            <div className="mt-2 text-sm font-semibold" style={{ color: VERDICT_STYLE[activeEdge.verdict].stroke }}>
               {VERDICT_STYLE[activeEdge.verdict].label}
             </div>
             {activeEdge.observed && (
-              <div className="mt-2 text-sm text-text" data-edge-observed>
+              <div className="mt-2 rounded-lg bg-raised/70 p-2.5 text-sm text-text" data-edge-observed>
                 Observed on{' '}
                 <span className="font-mono">
                   {activeEdge.observed.ports.map((p) => `${p.port}/${p.protocol}`).join(', ')}
@@ -270,10 +274,8 @@ function WorkloadTopology({
                 )}
               </div>
             )}
-            <div className="mt-3">
-              <div className="font-mono text-xs uppercase tracking-wide text-quiet">
-                policies involved
-              </div>
+            <div className="mt-3 border-t border-edge pt-3">
+              <div className="text-xs font-medium text-muted">Policies involved</div>
               {activeEdge.policies?.length ? (
                 <ul className="mt-1 space-y-1">
                   {activeEdge.policies.map((p) => (
@@ -290,19 +292,9 @@ function WorkloadTopology({
                 </p>
               )}
             </div>
-          </div>
+          </GraphPanel>
         )}
       </div>
-    </div>
-  )
-}
-
-function EmptyHint({ children, tone }: { children: React.ReactNode; tone?: 'error' }) {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center">
-      <p className={`max-w-md text-center text-sm ${tone === 'error' ? 'text-block' : 'text-muted'}`}>
-        {children}
-      </p>
     </div>
   )
 }

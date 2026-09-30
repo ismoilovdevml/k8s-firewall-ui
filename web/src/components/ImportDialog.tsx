@@ -3,7 +3,8 @@ import type { ChangeEvent } from 'react'
 import { errorMessage } from '../api/client'
 import { useImportPolicies } from '../api/queries'
 import type { ImportResponse } from '../api/types'
-import { Badge, Button, Feedback, Modal } from './ui'
+import { IconUpload } from './icons'
+import { Badge, Button, Feedback, Field, Modal, Select, Textarea } from './ui'
 
 const ACTION_TONE = { created: 'ok', updated: 'info', unchanged: 'neutral', error: 'block' } as const
 
@@ -44,28 +45,45 @@ export default function ImportDialog({ namespaces, onClose }: { namespaces: stri
   const canApply = validated === yaml + '\u0000' + namespace
 
   return (
-    <Modal title="Import NetworkPolicies" onClose={onClose} wide>
-      <p className="text-sm text-muted">
-        Paste or upload YAML with one or more NetworkPolicy documents (separated by <code>---</code>, or a
-        List). Existing policies with the same name are updated; identical ones are left untouched.
-      </p>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <input type="file" accept=".yaml,.yml,.json" onChange={onFile} className="text-xs text-muted" />
-        <label className="ml-auto flex items-center gap-1 text-xs text-muted">
-          default namespace
-          <select
-            value={namespace}
-            onChange={(e) => setNamespace(e.target.value)}
-            className="rounded border border-edge bg-surface px-2 py-1 font-mono text-xs text-text"
+    <Modal
+      title="Import NetworkPolicies"
+      description="Paste or upload YAML with one or more NetworkPolicy documents. Existing policies with the same name are updated; identical ones are left untouched."
+      onClose={onClose}
+      wide
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {result && !result.dryRun ? 'Close' : 'Cancel'}
+          </Button>
+          <Button onClick={() => run(true)} disabled={yaml.trim() === '' || importer.isPending}>
+            Validate (dry-run)
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => run(false)}
+            disabled={!canApply || importer.isPending}
+            title={canApply ? undefined : 'Validate first'}
           >
+            Import
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-edge-strong bg-raised/50 px-3 text-sm text-muted hover:border-accent hover:text-accent-strong">
+          <IconUpload size={15} /> Upload file
+          <input type="file" accept=".yaml,.yml,.json" onChange={onFile} className="sr-only" />
+        </label>
+        <Field label="Default namespace" className="ml-auto">
+          <Select mono value={namespace} onChange={(e) => setNamespace(e.target.value)} className="h-8">
             <option value="">(from documents)</option>
             {namespaces.map((ns) => (
               <option key={ns}>{ns}</option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
       </div>
-      <textarea
+      <Textarea
         value={yaml}
         onChange={(e) => {
           setYaml(e.target.value)
@@ -73,20 +91,27 @@ export default function ImportDialog({ namespaces, onClose }: { namespaces: stri
         }}
         rows={12}
         spellCheck={false}
-        placeholder={'apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-ingress\n  namespace: team-a\nspec:\n  podSelector: {}\n  policyTypes: [Ingress]'}
-        className="mt-2 w-full rounded border border-edge bg-base p-2 font-mono text-xs text-text placeholder:text-quiet focus:border-accent focus:outline-none"
+        aria-label="YAML to import"
+        placeholder={
+          'apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-ingress\n  namespace: team-a\nspec:\n  podSelector: {}\n  policyTypes: [Ingress]'
+        }
+        className="mt-3 w-full"
       />
+      <p className="mt-1.5 text-xs text-quiet">
+        Separate documents with <code className="font-mono">---</code>, or paste a List. Import unlocks after a clean
+        validation.
+      </p>
 
       {importer.isError && <Feedback tone="error">{errorMessage(importer.error)}</Feedback>}
       {result && (
-        <div className="mt-3">
-          <p className="text-sm text-text">
+        <div className="mt-3 rounded-lg border border-edge bg-raised/40 p-3">
+          <p className="text-sm font-medium text-text">
             {result.dryRun ? 'Dry-run: ' : 'Applied: '}
             {Object.entries(result.summary)
               .map(([k, v]) => `${v} ${k}`)
               .join(', ')}
           </p>
-          <ul className="mt-2 max-h-48 space-y-1 overflow-auto">
+          <ul className="mt-2 max-h-48 space-y-1.5 overflow-auto">
             {result.results.map((r) => (
               <li key={`${r.namespace}/${r.name}`} className="flex items-start gap-2 text-xs">
                 <Badge tone={ACTION_TONE[r.action]}>{r.action}</Badge>
@@ -99,23 +124,6 @@ export default function ImportDialog({ namespaces, onClose }: { namespaces: stri
           </ul>
         </div>
       )}
-
-      <div className="mt-4 flex justify-end gap-2">
-        <Button variant="ghost" onClick={onClose}>
-          {result && !result.dryRun ? 'Close' : 'Cancel'}
-        </Button>
-        <Button onClick={() => run(true)} disabled={yaml.trim() === '' || importer.isPending}>
-          Validate (dry-run)
-        </Button>
-        <Button
-          variant="primary"
-          onClick={() => run(false)}
-          disabled={!canApply || importer.isPending}
-          title={canApply ? undefined : 'Validate first'}
-        >
-          Import
-        </Button>
-      </div>
     </Modal>
   )
 }

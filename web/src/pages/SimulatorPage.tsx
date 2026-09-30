@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 import { apiSend } from '../api/client'
 import { useNamespacePods, useNamespaces } from '../api/queries'
 import type { PolicyRef } from '../api/types'
+import { Alert, Badge, Button, Card, Field, Input, Page, PageHeader, Segmented, Select } from '../components/ui'
+import { IconArrowRight, IconCheck, IconFlask, IconPlay, IconX } from '../components/icons'
 
 interface Endpoint {
   kind: 'pod' | 'ip'
@@ -58,9 +60,7 @@ export default function SimulatorPage() {
     simulate.mutate({
       source: { kind: 'pod', namespace: src.namespace, name: src.name },
       destination:
-        dstKind === 'pod'
-          ? { kind: 'pod', namespace: dst.namespace, name: dst.name }
-          : { kind: 'ip', ip: dst.ip },
+        dstKind === 'pod' ? { kind: 'pod', namespace: dst.namespace, name: dst.name } : { kind: 'ip', ip: dst.ip },
       ...(port !== '' ? { port: { protocol, port: Number(port) } } : {}),
     })
   }
@@ -73,144 +73,155 @@ export default function SimulatorPage() {
   const res = simulate.data
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
-      <h1 className="text-lg font-bold text-text">Connection simulator</h1>
-      <p className="mt-1 text-sm text-muted">
-        Answers “can A reach B?” from the NetworkPolicies on the cluster, and explains which rule
-        decided each side.
-      </p>
+    <Page width="narrow">
+      <PageHeader
+        icon={<IconFlask size={20} />}
+        title="Connection simulator"
+        subtitle="Answers “can A reach B?” from the NetworkPolicies on the cluster, and explains which rule decided each side. Nothing is sent over the network."
+      />
 
-      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <section className="rounded-md border border-edge bg-surface p-4">
-          <h2 className="font-mono text-[11px] uppercase tracking-wide text-quiet">source pod</h2>
-          <PodPicker label="source" value={src} onChange={setSrc} />
-        </section>
+      <Card>
+        <div className="grid items-stretch gap-4 md:grid-cols-[1fr_auto_1fr]">
+          <div className="rounded-xl border border-edge bg-raised/40 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-text">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-on-accent">
+                A
+              </span>
+              Source pod
+            </div>
+            <PodPicker label="source" value={src} onChange={setSrc} />
+          </div>
 
-        <section className="rounded-md border border-edge bg-surface p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-mono text-[11px] uppercase tracking-wide text-quiet">destination</h2>
-            <div className="flex gap-1 font-mono text-xs">
-              {(['pod', 'ip'] as const).map((k) => (
-                <button
-                  key={k}
-                  onClick={() => setDstKind(k)}
-                  className={`rounded px-2 py-0.5 ${
-                    dstKind === k ? 'bg-raised text-accent-strong' : 'text-muted hover:text-text'
-                  }`}
+          <div className="flex flex-row items-center justify-center gap-3 md:flex-col">
+            <IconArrowRight size={22} className="rotate-90 text-quiet md:rotate-0" />
+            <div className="flex items-end gap-2">
+              <Field label="Protocol">
+                <Select
+                  aria-label="protocol"
+                  mono
+                  value={protocol}
+                  onChange={(e) => setProtocol(e.target.value as typeof protocol)}
+                  className="w-24"
                 >
-                  {k === 'pod' ? 'pod' : 'external IP'}
-                </button>
-              ))}
+                  <option>TCP</option>
+                  <option>UDP</option>
+                  <option>SCTP</option>
+                </Select>
+              </Field>
+              <Field label="Port">
+                <Input
+                  aria-label="port"
+                  mono
+                  value={port}
+                  onChange={(e) => setPort(e.target.value.replace(/\D/g, ''))}
+                  placeholder="any"
+                  className="w-20"
+                />
+              </Field>
             </div>
           </div>
-          {dstKind === 'pod' ? (
-            <PodPicker
-              label="destination"
-              value={{ namespace: dst.namespace, name: dst.name }}
-              onChange={(v) => setDst({ ...dst, ...v })}
-            />
-          ) : (
-            <input
-              value={dst.ip}
-              onChange={(e) => setDst({ ...dst, ip: e.target.value })}
-              placeholder="e.g. 203.0.113.7"
-              className="mt-2 w-full rounded border border-edge bg-base px-2 py-1.5 font-mono text-sm text-text placeholder:text-quiet focus:border-accent focus:outline-none"
-            />
-          )}
-        </section>
-      </div>
 
-      <div className="mt-4 flex items-end gap-3">
-        <label className="block">
-          <span className="mb-1 block font-mono text-[10px] uppercase tracking-wide text-quiet">
-            protocol
-          </span>
-          <select
-            aria-label="protocol"
-            value={protocol}
-            onChange={(e) => setProtocol(e.target.value as typeof protocol)}
-            className="rounded border border-edge bg-surface px-2 py-1.5 font-mono text-sm text-text focus:border-accent focus:outline-none"
-          >
-            <option>TCP</option>
-            <option>UDP</option>
-            <option>SCTP</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block font-mono text-[10px] uppercase tracking-wide text-quiet">
-            port
-          </span>
-          <input
-            aria-label="port"
-            value={port}
-            onChange={(e) => setPort(e.target.value.replace(/\D/g, ''))}
-            placeholder="any"
-            className="w-28 rounded border border-edge bg-surface px-2 py-1.5 font-mono text-sm text-text placeholder:text-quiet focus:border-accent focus:outline-none"
-          />
-        </label>
-        <button
-          onClick={run}
-          disabled={!ready || simulate.isPending}
-          className="rounded bg-accent px-4 py-1.5 text-sm font-medium text-on-accent hover:brightness-110 disabled:opacity-50"
-        >
-          Simulate
-        </button>
-      </div>
+          <div className="rounded-xl border border-edge bg-raised/40 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-text">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-info text-xs font-bold text-white dark:text-base">
+                  B
+                </span>
+                Destination
+              </div>
+              <Segmented
+                label="Destination type"
+                value={dstKind}
+                onChange={setDstKind}
+                options={[
+                  { id: 'pod', label: 'Pod' },
+                  { id: 'ip', label: 'External IP' },
+                ]}
+              />
+            </div>
+            {dstKind === 'pod' ? (
+              <PodPicker
+                label="destination"
+                value={{ namespace: dst.namespace, name: dst.name }}
+                onChange={(v) => setDst({ ...dst, ...v })}
+              />
+            ) : (
+              <div className="mt-3">
+                <Input
+                  mono
+                  aria-label="destination IP"
+                  value={dst.ip}
+                  onChange={(e) => setDst({ ...dst, ip: e.target.value })}
+                  placeholder="e.g. 203.0.113.7"
+                  className="w-full"
+                />
+              </div>
+            )}
+          </div>
+        </div>
 
-      {simulate.error && (
-        <p className="mt-4 font-mono text-xs text-block">{String(simulate.error)}</p>
-      )}
+        <div className="mt-5 flex flex-wrap items-center justify-end gap-3 border-t border-edge pt-4">
+          <span className="mr-auto text-xs text-muted">
+            {ready ? 'Ready — run the check.' : 'Pick a source pod and a destination to simulate.'}
+          </span>
+          <Button variant="primary" onClick={run} disabled={!ready || simulate.isPending} icon={<IconPlay size={14} />}>
+            Simulate
+          </Button>
+        </div>
+      </Card>
+
+      {simulate.error && <Alert tone="block">{String(simulate.error)}</Alert>}
 
       {res && (
-        <div className="mt-6">
+        <div className="space-y-4">
           <div
-            className={`flex items-center gap-4 rounded-xl border-2 p-5 ${
-              res.allowed ? 'border-allow bg-allow/10' : 'border-block bg-block/10'
+            className={`flex items-center gap-4 rounded-2xl border p-5 ${
+              res.allowed ? 'border-allow/40 bg-allow-soft' : 'border-block/40 bg-block-soft'
             }`}
           >
             <span
               aria-hidden
-              className={`text-3xl font-bold ${res.allowed ? 'text-accent-strong' : 'text-block'}`}
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+                res.allowed ? 'bg-allow text-white dark:text-base' : 'bg-block text-white dark:text-base'
+              }`}
             >
-              {res.allowed ? '✓' : '✕'}
+              {res.allowed ? <IconCheck size={26} /> : <IconX size={26} />}
             </span>
             <div>
-              <div
-                className={`text-xl font-bold ${res.allowed ? 'text-accent-strong' : 'text-block'}`}
-              >
+              <div className={`text-xl font-bold ${res.allowed ? 'text-accent-strong' : 'text-block'}`}>
                 {res.allowed ? 'Connection allowed' : 'Connection blocked'}
               </div>
               <div className="mt-0.5 text-sm text-muted">
-                source egress: {sideWord(res.egress)} · destination ingress: {sideWord(res.ingress)}
+                A connection needs both checks to pass: the source may send (egress) and the destination may receive
+                (ingress).
               </div>
             </div>
           </div>
 
           {res.warnings && res.warnings.length > 0 && (
-            <ul className="mt-3 space-y-1.5">
+            <div className="space-y-2">
               {res.warnings.map((w) => (
-                <li
+                <Alert
                   key={w.code + w.message}
-                  className={`rounded-lg border px-3 py-2 text-sm ${
-                    w.severity === 'warning'
-                      ? 'border-warn bg-warn-bg text-warn-text'
-                      : 'border-edge bg-surface text-muted'
-                  }`}
+                  tone={w.severity === 'warning' ? 'warn' : 'info'}
+                  title={<span className="font-mono text-xs">{w.code}</span>}
                 >
-                  <span className="font-mono text-[10px] font-semibold uppercase">⚠ {w.code}</span> —{' '}
                   {w.message}
-                </li>
+                </Alert>
               ))}
-            </ul>
+            </div>
           )}
 
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <SidePanel title="source egress check" side={res.egress} />
-            <SidePanel title="destination ingress check" side={res.ingress} />
+          <div className="grid items-stretch gap-4 md:grid-cols-[1fr_auto_1fr]">
+            <SidePanel step={1} title="Source egress check" subtitle="May A send this traffic?" side={res.egress} />
+            <div className="hidden items-center md:flex">
+              <IconArrowRight size={20} className="text-quiet" />
+            </div>
+            <SidePanel step={2} title="Destination ingress check" subtitle="May B receive it?" side={res.ingress} />
           </div>
         </div>
       )}
-    </div>
+    </Page>
   )
 }
 
@@ -227,12 +238,13 @@ function PodPicker({
   const { data: pods } = useNamespacePods(value.namespace)
 
   return (
-    <div className="mt-2 space-y-2">
-      <select
+    <div className="mt-3 space-y-2">
+      <Select
         aria-label={`${label} namespace`}
+        mono
         value={value.namespace}
         onChange={(e) => onChange({ namespace: e.target.value, name: '' })}
-        className="w-full rounded border border-edge bg-base px-2 py-1.5 font-mono text-sm text-text focus:border-accent focus:outline-none"
+        className="w-full"
       >
         <option value="">namespace…</option>
         {(namespaces ?? [])
@@ -242,13 +254,14 @@ function PodPicker({
               {ns.name}
             </option>
           ))}
-      </select>
-      <select
+      </Select>
+      <Select
         aria-label={`${label} pod`}
+        mono
         value={value.name}
         onChange={(e) => onChange({ ...value, name: e.target.value })}
         disabled={value.namespace === ''}
-        className="w-full rounded border border-edge bg-base px-2 py-1.5 font-mono text-sm text-text focus:border-accent focus:outline-none disabled:opacity-40"
+        className="w-full"
       >
         <option value="">pod…</option>
         {(pods ?? []).map((p) => (
@@ -256,53 +269,75 @@ function PodPicker({
             {p.name}
           </option>
         ))}
-      </select>
+      </Select>
     </div>
   )
 }
 
-function SidePanel({ title, side }: { title: string; side: SideResult }) {
+function SidePanel({
+  step,
+  title,
+  subtitle,
+  side,
+}: {
+  step: number
+  title: string
+  subtitle: string
+  side: SideResult
+}) {
+  const verdict = sideWord(side)
+  const tone = verdict === 'pass' ? 'ok' : verdict === 'deny' ? 'block' : 'neutral'
   return (
-    <section className="rounded-md border border-edge bg-surface p-4">
-      <h2 className="font-mono text-[11px] uppercase tracking-wide text-quiet">{title}</h2>
+    <Card>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="text-xs font-medium text-quiet">Step {step}</div>
+          <h2 className="text-sm font-semibold text-text">{title}</h2>
+          <p className="text-xs text-muted">{subtitle}</p>
+        </div>
+        <Badge tone={tone} dot>
+          {verdict}
+        </Badge>
+      </div>
       {!side.applicable ? (
-        <p className="mt-2 text-sm text-muted">
-          Not evaluated — the destination is outside the cluster.
-        </p>
+        <p className="mt-3 text-sm text-muted">Not evaluated — the destination is outside the cluster.</p>
       ) : (
         <>
-          <p className="mt-2 font-mono text-sm">
+          <p className="mt-3 text-sm">
             {side.isolated ? (
               side.allowed ? (
-                <span className="text-accent-strong">isolated — allowed by rule</span>
+                <span className="text-accent-strong">Isolated — allowed by a rule</span>
               ) : (
-                <span className="text-block">isolated — no rule matches (deny)</span>
+                <span className="text-block">Isolated — no rule matches (deny)</span>
               )
             ) : (
-              <span className="text-muted">not isolated — everything allowed by default</span>
+              <span className="text-muted">Not isolated — everything is allowed by default</span>
             )}
           </p>
           {side.matchedRules && side.matchedRules.length > 0 && (
-            <ul className="mt-2 space-y-1.5">
+            <ul className="mt-3 space-y-2">
               {side.matchedRules.map((m) => (
-                <li key={`${m.policy.namespace}/${m.policy.name}/${m.ruleIndex}`} className="text-sm text-text">
+                <li
+                  key={`${m.policy.namespace}/${m.policy.name}/${m.ruleIndex}`}
+                  className="rounded-lg border border-edge bg-raised/40 p-2.5 text-sm text-text"
+                >
                   {m.explanation}{' '}
                   <Link
                     to={`/policies/${m.policy.namespace}/${m.policy.name}`}
-                    className="font-mono text-xs text-accent-strong hover:underline"
+                    className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-accent-strong hover:underline"
                   >
-                    open →
+                    open <IconArrowRight size={12} />
                   </Link>
                 </li>
               ))}
             </ul>
           )}
           {side.evaluatedPolicies && side.evaluatedPolicies.length > 0 && (
-            <details className="mt-3">
-              <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-quiet hover:text-muted">
-                policies evaluated ({side.evaluatedPolicies.length})
+            <details className="mt-3 border-t border-edge pt-2">
+              <summary className="cursor-pointer text-xs font-medium text-muted hover:text-text">
+                Policies evaluated ({side.evaluatedPolicies.length})
               </summary>
-              <ul className="mt-1 space-y-0.5">
+              <ul className="mt-1.5 space-y-0.5">
                 {side.evaluatedPolicies.map((p) => (
                   <li key={`${p.namespace}/${p.name}`}>
                     <Link
@@ -318,6 +353,6 @@ function SidePanel({ title, side }: { title: string; side: SideResult }) {
           )}
         </>
       )}
-    </section>
+    </Card>
   )
 }
