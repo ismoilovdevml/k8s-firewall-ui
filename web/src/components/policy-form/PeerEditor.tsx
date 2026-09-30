@@ -1,4 +1,6 @@
 import type { PeerDraft, PeerKind } from '../../policy/model'
+import { IconInfo, IconTrash } from '../icons'
+import { IconButton, Input, Select } from '../ui'
 import LabelMapEditor from './LabelMapEditor'
 
 const KIND_LABELS: Record<PeerKind, string> = {
@@ -18,8 +20,7 @@ export default function PeerEditor({ value, onChange, onRemove }: Props) {
   const setKind = (kind: PeerKind) => {
     const next: PeerDraft = { kind }
     if (kind === 'pods' || kind === 'podsInNamespaces') next.podSelector = value.podSelector ?? {}
-    if (kind === 'namespaces' || kind === 'podsInNamespaces')
-      next.namespaceSelector = value.namespaceSelector ?? {}
+    if (kind === 'namespaces' || kind === 'podsInNamespaces') next.namespaceSelector = value.namespaceSelector ?? {}
     if (kind === 'ipBlock') {
       next.cidr = value.cidr ?? ''
       next.except = value.except ?? []
@@ -28,40 +29,35 @@ export default function PeerEditor({ value, onChange, onRemove }: Props) {
   }
 
   return (
-    <div className="rounded-md border border-edge bg-surface p-3">
+    <div className="rounded-lg border border-edge bg-surface p-3">
       <div className="flex items-center justify-between gap-2">
-        <select
+        <Select
+          aria-label="Peer type"
           value={value.kind}
           onChange={(e) => setKind(e.target.value as PeerKind)}
-          className="rounded border border-edge bg-base px-2 py-1 text-xs text-text focus:border-accent focus:outline-none"
+          className="h-8 text-[13px]"
         >
           {(Object.keys(KIND_LABELS) as PeerKind[]).map((k) => (
             <option key={k} value={k}>
               {KIND_LABELS[k]}
             </option>
           ))}
-        </select>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-xs text-quiet hover:text-block"
-          aria-label="Remove peer"
-        >
-          Remove
-        </button>
+        </Select>
+        <IconButton label="Remove peer" onClick={onRemove} className="hover:bg-block-soft hover:text-block">
+          <IconTrash size={15} />
+        </IconButton>
       </div>
 
       {value.kind === 'podsInNamespaces' && (
-        <p className="mt-2 text-xs text-quiet">
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-muted">
+          <IconInfo size={13} className="mt-0.5 text-info" />
           Both conditions must match (AND). To allow either one, add two separate peers instead.
         </p>
       )}
 
       {(value.kind === 'pods' || value.kind === 'podsInNamespaces') && (
-        <div className="mt-2">
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-quiet">
-            pod labels
-          </div>
+        <div className="mt-3">
+          <div className="mb-1 text-xs font-medium text-muted">Pod labels</div>
           <LabelMapEditor
             value={value.podSelector ?? {}}
             onChange={(podSelector) => onChange({ ...value, podSelector })}
@@ -71,10 +67,8 @@ export default function PeerEditor({ value, onChange, onRemove }: Props) {
       )}
 
       {(value.kind === 'namespaces' || value.kind === 'podsInNamespaces') && (
-        <div className="mt-2">
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-quiet">
-            namespace labels
-          </div>
+        <div className="mt-3">
+          <div className="mb-1 text-xs font-medium text-muted">Namespace labels</div>
           <LabelMapEditor
             value={value.namespaceSelector ?? {}}
             onChange={(namespaceSelector) => onChange({ ...value, namespaceSelector })}
@@ -84,14 +78,17 @@ export default function PeerEditor({ value, onChange, onRemove }: Props) {
       )}
 
       {value.kind === 'ipBlock' && (
-        <div className="mt-2 space-y-1.5">
-          <input
+        <div className="mt-3 space-y-2">
+          <Input
+            mono
             value={value.cidr ?? ''}
             onChange={(e) => onChange({ ...value, cidr: e.target.value })}
             placeholder="CIDR, e.g. 10.0.0.0/8"
-            className="w-full rounded border border-edge bg-base px-2 py-1 font-mono text-xs text-text placeholder:text-quiet focus:border-accent focus:outline-none"
+            aria-label="CIDR"
+            className="h-8 w-full"
           />
-          <input
+          <Input
+            mono
             value={(value.except ?? []).join(', ')}
             onChange={(e) =>
               onChange({
@@ -103,7 +100,8 @@ export default function PeerEditor({ value, onChange, onRemove }: Props) {
               })
             }
             placeholder="except CIDRs, comma-separated (optional)"
-            className="w-full rounded border border-edge bg-base px-2 py-1 font-mono text-xs text-text placeholder:text-quiet focus:border-accent focus:outline-none"
+            aria-label="Excluded CIDRs"
+            className="h-8 w-full"
           />
         </div>
       )}

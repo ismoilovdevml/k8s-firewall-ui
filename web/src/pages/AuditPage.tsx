@@ -3,11 +3,23 @@ import { Link } from 'react-router-dom'
 import { errorMessage } from '../api/client'
 import { useAudit, useMe } from '../api/queries'
 import type { AuditEntry } from '../api/types'
-import { Badge, PageHeader, Spinner } from '../components/ui'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Page,
+  PageHeader,
+  SearchInput,
+  Select,
+  Spinner,
+  THead,
+  Table,
+} from '../components/ui'
+import { td, th } from '../components/styles'
+import { IconChevronDown, IconHistory, IconUser } from '../components/icons'
 import DiffView from '../components/DiffView'
-
-const inputCls =
-  'rounded border border-edge bg-surface px-2 py-1.5 font-mono text-xs text-text placeholder:text-quiet focus:border-accent focus:outline-none'
 
 export default function AuditPage() {
   const [action, setAction] = useState('')
@@ -17,66 +29,70 @@ export default function AuditPage() {
   const [open, setOpen] = useState<number | null>(null)
 
   return (
-    <div className="p-6">
+    <Page>
       <PageHeader
+        icon={<IconHistory size={20} />}
         title="Audit log"
         subtitle={
           <>
-            Every policy change made through this UI, newest first. The server keeps the most recent
-            entries in memory; the durable record is its structured log output
+            Every policy change made through this UI, newest first. The server keeps the most recent entries in memory;
+            the durable record is its structured log output
             {me?.mode !== 'none' && ' and the Kubernetes API audit log, which records you as the author'}.
           </>
         }
       />
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <select aria-label="Action" value={action} onChange={(e) => setAction(e.target.value)} className={inputCls}>
-          <option value="">all actions</option>
-          <option value="create">create</option>
-          <option value="update">update</option>
-          <option value="delete">delete</option>
-        </select>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Filter namespace/name…"
-          className={`${inputCls} w-64`}
-        />
-      </div>
-
-      <div className="mt-4 overflow-x-auto rounded-xl border border-edge bg-surface shadow-sm">
+      <Card flush>
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+          <SearchInput
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Filter namespace/name…"
+            aria-label="Filter audit entries"
+            className="w-full sm:w-72"
+          />
+          <Select aria-label="Action" value={action} onChange={(e) => setAction(e.target.value)}>
+            <option value="">All actions</option>
+            <option value="create">create</option>
+            <option value="update">update</option>
+            <option value="delete">delete</option>
+          </Select>
+          {data && <span className="ml-auto text-xs text-muted">{data.length} entries</span>}
+        </div>
         {isLoading ? (
           <Spinner />
         ) : error ? (
-          <p className="p-6 text-sm text-block">{errorMessage(error)}</p>
+          <div className="p-4">
+            <Alert tone="block">{errorMessage(error)}</Alert>
+          </div>
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="bg-raised font-mono text-[11px] uppercase tracking-wide text-muted">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">time</th>
-                <th className="px-4 py-2.5 font-medium">user</th>
-                <th className="px-4 py-2.5 font-medium">action</th>
-                <th className="px-4 py-2.5 font-medium">policy</th>
-                <th className="px-4 py-2.5 font-medium">result</th>
-                <th className="px-4 py-2.5 font-medium" />
-              </tr>
-            </thead>
+          <Table>
+            <THead>
+              <th className={th}>Time</th>
+              <th className={th}>User</th>
+              <th className={th}>Action</th>
+              <th className={th}>Policy</th>
+              <th className={th}>Result</th>
+              <th className={th} />
+            </THead>
             <tbody>
               {(data ?? []).map((e) => (
                 <Row key={e.id} e={e} open={open === e.id} onToggle={() => setOpen(open === e.id ? null : e.id)} />
               ))}
               {data?.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted">
-                    No changes recorded since the server started.
+                  <td colSpan={6}>
+                    <EmptyState icon={<IconHistory size={22} />} title="No changes recorded yet">
+                      Changes made through this UI since the server started will appear here.
+                    </EmptyState>
                   </td>
                 </tr>
               )}
             </tbody>
-          </table>
+          </Table>
         )}
-      </div>
-    </div>
+      </Card>
+    </Page>
   )
 }
 
@@ -85,18 +101,25 @@ const ACTION_TONE = { create: 'ok', update: 'info', delete: 'block' } as const
 function Row({ e, open, onToggle }: { e: AuditEntry; open: boolean; onToggle: () => void }) {
   return (
     <>
-      <tr className="border-t border-edge/60 hover:bg-raised/50">
-        <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-muted" title={e.time}>
+      <tr className={`border-b border-edge/70 transition-colors hover:bg-raised/40 ${open ? 'bg-raised/40' : ''}`}>
+        <td className={`${td} whitespace-nowrap text-xs text-muted`} title={e.time}>
           {new Date(e.time).toLocaleString()}
         </td>
-        <td className="px-4 py-2.5 text-xs text-text">
-          <div className="font-medium">{e.user}</div>
-          {e.sourceIP && <div className="font-mono text-[11px] text-quiet">{e.sourceIP}</div>}
+        <td className={td}>
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-raised text-quiet">
+              <IconUser size={14} />
+            </span>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium text-text">{e.user}</div>
+              {e.sourceIP && <div className="font-mono text-[11px] text-quiet">{e.sourceIP}</div>}
+            </div>
+          </div>
         </td>
-        <td className="px-4 py-2.5">
+        <td className={td}>
           <Badge tone={ACTION_TONE[e.action]}>{e.action}</Badge>
         </td>
-        <td className="px-4 py-2.5 font-mono text-xs">
+        <td className={`${td} font-mono text-xs`}>
           {e.action === 'delete' || e.result === 'failure' ? (
             <span className="text-text">
               {e.namespace}/{e.name}
@@ -107,19 +130,32 @@ function Row({ e, open, onToggle }: { e: AuditEntry; open: boolean; onToggle: ()
             </Link>
           )}
         </td>
-        <td className="px-4 py-2.5">
-          {e.result === 'success' ? <Badge tone="ok">✓ success</Badge> : <Badge tone="block">✗ failed</Badge>}
+        <td className={td}>
+          {e.result === 'success' ? (
+            <Badge tone="ok" dot>
+              success
+            </Badge>
+          ) : (
+            <Badge tone="block" dot>
+              failed
+            </Badge>
+          )}
         </td>
-        <td className="px-4 py-2.5 text-right">
-          <button onClick={onToggle} className="text-xs font-medium text-accent-strong hover:underline">
+        <td className={`${td} text-right`}>
+          <Button size="xs" variant="ghost" onClick={onToggle} aria-expanded={open}>
             {open ? 'Hide' : 'Details'}
-          </button>
+            <IconChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+          </Button>
         </td>
       </tr>
       {open && (
-        <tr>
-          <td colSpan={6} className="bg-base px-4 py-3">
-            {e.error && <p className="mb-2 font-mono text-xs text-block">{e.error}</p>}
+        <tr className="border-b border-edge/70">
+          <td colSpan={6} className="bg-raised/40 px-4 py-3">
+            {e.error && (
+              <Alert tone="block" className="mb-2">
+                <span className="font-mono text-xs">{e.error}</span>
+              </Alert>
+            )}
             <DiffView before={e.before ?? ''} after={e.after ?? ''} />
           </td>
         </tr>

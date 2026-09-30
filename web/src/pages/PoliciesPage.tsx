@@ -1,10 +1,30 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { exportUrl, useClusterInfo, useNamespaces, usePolicies, usePosture } from '../api/queries'
 import { policyStatus } from '../policy/status'
 import ImportDialog from '../components/ImportDialog'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Page,
+  PageHeader,
+  SearchInput,
+  Select,
+  Spinner,
+  THead,
+  Table,
+} from '../components/ui'
+import { buttonClass, td, th } from '../components/styles'
+import { IconAlertTriangle, IconDownload, IconFileText, IconPlus, IconUpload } from '../components/icons'
+
+// policyStatus labels carry a leading symbol for plain-text contexts; the
+// table shows a colored dot instead.
+const stripSymbol = (label: string) => label.replace(/^[^\p{L}]+/u, '')
 
 export default function PoliciesPage() {
+  const navigate = useNavigate()
   const [namespace, setNamespace] = useState('')
   const [search, setSearch] = useState('')
   const [importing, setImporting] = useState(false)
@@ -14,145 +34,169 @@ export default function PoliciesPage() {
   // Unknown CNI = unverified, not "not enforced".
   const cniEnforces = info?.cni?.provider === 'unknown' ? undefined : info?.cni?.enforcesPolicies
   const { data: posture } = usePosture()
-  const issues = new Map<string, number>()
-  for (const f of posture?.findings ?? []) {
-    if (f.policy && f.severity !== 'info') {
-      const key = `${f.policy.namespace}/${f.policy.name}`
-      issues.set(key, (issues.get(key) ?? 0) + 1)
+  const issues = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const f of posture?.findings ?? []) {
+      if (f.policy && f.severity !== 'info') {
+        const key = `${f.policy.namespace}/${f.policy.name}`
+        m.set(key, (m.get(key) ?? 0) + 1)
+      }
     }
-  }
+    return m
+  }, [posture])
 
   const filtered = (policies ?? []).filter(
     (p) => !search || `${p.namespace}/${p.name}`.toLowerCase().includes(search.toLowerCase()),
   )
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-lg font-bold text-text">Network Policies</h1>
-        <div className="flex gap-2">
-          <a
-            href={exportUrl(namespace || undefined)}
-            download
-            className="rounded border border-edge bg-surface px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong"
-          >
-            Export YAML
-          </a>
-          {!info?.readOnly && (
-            <>
-              <button
-                onClick={() => setImporting(true)}
-                className="rounded border border-edge bg-surface px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent-strong"
-              >
-                Import
-              </button>
-              <Link
-                to="/policies/new"
-                className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-on-accent hover:brightness-110"
-              >
-                New policy
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
+    <Page>
+      <PageHeader
+        icon={<IconFileText size={20} />}
+        title="Network Policies"
+        subtitle="Every NetworkPolicy on the cluster: which directions it isolates, how many pods it selects, and whether it has problems."
+        actions={
+          <>
+            <a href={exportUrl(namespace || undefined)} download className={buttonClass('secondary')}>
+              <IconDownload size={16} /> Export YAML
+            </a>
+            {!info?.readOnly && (
+              <>
+                <Button onClick={() => setImporting(true)} icon={<IconUpload size={16} />}>
+                  Import
+                </Button>
+                <Link to="/policies/new" className={buttonClass('primary')}>
+                  <IconPlus size={16} /> New policy
+                </Link>
+              </>
+            )}
+          </>
+        }
+      />
       {importing && (
         <ImportDialog namespaces={(namespaces ?? []).map((n) => n.name)} onClose={() => setImporting(false)} />
       )}
 
-      <div className="mt-4 flex gap-2">
-        <select
-          value={namespace}
-          onChange={(e) => setNamespace(e.target.value)}
-          className="rounded border border-edge bg-surface px-2 py-1.5 font-mono text-xs text-text focus:border-accent focus:outline-none"
-        >
-          <option value="">all namespaces</option>
-          {(namespaces ?? []).map((ns) => (
-            <option key={ns.name} value={ns.name}>
-              {ns.name} ({ns.policyCount})
-            </option>
-          ))}
-        </select>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Filter by name…"
-          className="w-64 rounded border border-edge bg-surface px-3 py-1.5 font-mono text-xs text-text placeholder:text-quiet focus:border-accent focus:outline-none"
-        />
-      </div>
-
-      <div className="mt-4 overflow-x-auto rounded-xl border border-edge bg-surface shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-raised font-mono text-[11px] uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-2.5 font-medium">namespace</th>
-              <th className="px-4 py-2.5 font-medium">name</th>
-              <th className="px-4 py-2.5 font-medium">directions</th>
-              <th className="px-4 py-2.5 font-medium">pods matched</th>
-              <th className="px-4 py-2.5 font-medium">status</th>
-              <th className="px-4 py-2.5 font-medium">issues</th>
-              <th className="px-4 py-2.5 font-medium">created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p) => {
-              const status = policyStatus(p.podsMatched, cniEnforces)
-              return (
-                <tr key={`${p.namespace}/${p.name}`} className="border-t border-edge/60 hover:bg-raised/50">
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted">{p.namespace}</td>
-                  <td className="px-4 py-2.5">
-                    <Link
-                      to={`/policies/${p.namespace}/${p.name}`}
-                      className="font-mono text-sm font-semibold text-accent-strong hover:underline"
-                    >
-                      {p.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span className="rounded-full bg-accent/10 px-2.5 py-0.5 font-mono text-[11px] font-medium text-accent-strong">
-                      {p.policyTypes.join(' + ')}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted">{p.podsMatched}</td>
-                  <td
-                    className={`px-4 py-2.5 text-xs font-semibold ${
-                      status.tone === 'ok'
-                        ? 'text-accent-strong'
-                        : status.tone === 'warn'
-                          ? 'text-warn-text'
-                          : 'text-block'
-                    }`}
+      <Card flush>
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+          <SearchInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by namespace or name…"
+            aria-label="Search policies"
+            className="w-full sm:w-72"
+          />
+          <Select aria-label="Namespace filter" value={namespace} onChange={(e) => setNamespace(e.target.value)} mono>
+            <option value="">All namespaces</option>
+            {(namespaces ?? []).map((ns) => (
+              <option key={ns.name} value={ns.name}>
+                {ns.name} ({ns.policyCount})
+              </option>
+            ))}
+          </Select>
+          <span className="ml-auto text-xs text-muted">
+            {filtered.length} of {policies?.length ?? 0} policies
+          </span>
+        </div>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Table>
+            <THead>
+              <th className={th}>Name</th>
+              <th className={th}>Namespace</th>
+              <th className={th}>Directions</th>
+              <th className={th}>Pods matched</th>
+              <th className={th}>Status</th>
+              <th className={th}>Issues</th>
+              <th className={th}>Created</th>
+            </THead>
+            <tbody>
+              {filtered.map((p) => {
+                const status = policyStatus(p.podsMatched, cniEnforces)
+                const tone = status.tone === 'ok' ? 'ok' : status.tone === 'warn' ? 'warn' : 'block'
+                const n = issues.get(`${p.namespace}/${p.name}`)
+                const href = `/policies/${p.namespace}/${p.name}`
+                return (
+                  <tr
+                    key={`${p.namespace}/${p.name}`}
+                    onClick={(e) => {
+                      // Whole row is clickable; real links inside keep their own behavior.
+                      if (!(e.target as HTMLElement).closest('a')) navigate(href)
+                    }}
+                    className="cursor-pointer border-b border-edge/70 transition-colors last:border-0 hover:bg-raised/50"
                   >
-                    {status.label}
-                  </td>
-                  <td className="px-4 py-2.5 text-xs">
-                    {issues.get(`${p.namespace}/${p.name}`) ? (
+                    <td className={td}>
                       <Link
-                        to={`/policies/${p.namespace}/${p.name}`}
-                        className="font-semibold text-warn-text hover:underline"
+                        to={href}
+                        className="font-mono text-[13px] font-semibold text-accent-strong hover:underline"
                       >
-                        ⚠ {issues.get(`${p.namespace}/${p.name}`)}
+                        {p.name}
                       </Link>
+                    </td>
+                    <td className={`${td} font-mono text-xs text-muted`}>{p.namespace}</td>
+                    <td className={td}>
+                      <div className="flex gap-1">
+                        {p.policyTypes.map((t) => (
+                          <Badge key={t} tone={t === 'Ingress' ? 'info' : 'neutral'}>
+                            {t}
+                          </Badge>
+                        ))}
+                      </div>
+                    </td>
+                    <td className={`${td} tabular-nums text-muted`}>{p.podsMatched}</td>
+                    <td className={td}>
+                      <Badge tone={tone} dot>
+                        {stripSymbol(status.label)}
+                      </Badge>
+                    </td>
+                    <td className={td}>
+                      {n ? (
+                        <Link
+                          to={href}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-warn-text hover:underline"
+                        >
+                          <IconAlertTriangle size={14} /> {n}
+                        </Link>
+                      ) : (
+                        <span className="text-quiet">—</span>
+                      )}
+                    </td>
+                    <td className={`${td} whitespace-nowrap text-xs text-quiet`} title={p.createdAt}>
+                      {p.createdAt.slice(0, 10)}
+                    </td>
+                  </tr>
+                )
+              })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7}>
+                    {policies?.length ? (
+                      <EmptyState icon={<IconFileText size={22} />} title="No policies match the filter">
+                        Try a different search or namespace.
+                      </EmptyState>
                     ) : (
-                      <span className="text-quiet">—</span>
+                      <EmptyState
+                        icon={<IconFileText size={22} />}
+                        title="No NetworkPolicies yet"
+                        action={
+                          !info?.readOnly && (
+                            <Link to="/policies/new" className={buttonClass('primary')}>
+                              <IconPlus size={16} /> Create your first policy
+                            </Link>
+                          )
+                        }
+                      >
+                        Every pod accepts all traffic. Create one to start restricting.
+                      </EmptyState>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-quiet">{p.createdAt.slice(0, 10)}</td>
                 </tr>
-              )
-            })}
-            {!isLoading && filtered.length === 0 && (
-              <tr className="border-t border-edge/60">
-                <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted">
-                  {policies?.length
-                    ? 'No policies match the filter.'
-                    : 'No NetworkPolicies yet — every pod accepts all traffic. Create one to start restricting.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+              )}
+            </tbody>
+          </Table>
+        )}
+      </Card>
+    </Page>
   )
 }

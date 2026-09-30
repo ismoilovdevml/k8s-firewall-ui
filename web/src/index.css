@@ -1,44 +1,169 @@
 @import 'tailwindcss';
 
-@theme {
-  /* Kiwi light palette: cream base, white surfaces, dark-teal sidebar,
-     teal accents. Block-red sits outside the green family on purpose so
-     allow/block never blend with the brand color. */
-  --color-base: #faf7f0;
-  --color-surface: #ffffff;
-  --color-raised: #f6f2e8;
-  --color-edge: #eee7d8;
-  --color-text: #0f2a24;
-  --color-muted: #64716c;
-  --color-quiet: #8a968f;
-  --color-accent: #0ab68b;
-  --color-accent-strong: #028174;
-  --color-on-accent: #04211d;
-  --color-allow: #0ab68b;
-  --color-block: #e05c52;
-  --color-warn: #d9a13f;
-  --color-warn-bg: #ffe3b3;
-  --color-warn-text: #7a5410;
-  --color-sidebar: #06373a;
-  --color-sidebar-text: #cfe8e0;
-  --color-sidebar-brand: #92de8b;
-  --color-sidebar-raised: #0a4a4e;
+/* Dark mode follows the data-theme attribute set by public/theme-init.js
+   (and the theme toggle), not only the OS preference. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+@theme {
+  /* Light palette: cool neutral base, white surfaces, teal brand. Block-red
+     and warn-amber sit outside the brand hue on purpose so allow/block never
+     blend with it. Every token is redefined for dark mode below. */
+  --color-base: #f5f7f9;
+  --color-surface: #ffffff;
+  --color-raised: #f0f3f6;
+  --color-sunken: #e9edf1;
+  --color-edge: #e2e7ec;
+  --color-edge-strong: #cbd3db;
+  --color-text: #0f1b24;
+  --color-muted: #52616d;
+  --color-quiet: #8795a1;
+  --color-accent: #0e9f7e;
+  --color-accent-strong: #067a62;
+  --color-accent-soft: #e3f6f0;
+  --color-on-accent: #ffffff;
+  --color-allow: #12a37f;
+  --color-allow-soft: #e3f6f0;
+  --color-block: #d64545;
+  --color-block-soft: #fdecec;
+  --color-warn: #d69a2d;
+  --color-warn-bg: #fdf1d8;
+  --color-warn-text: #7a5410;
+  --color-info: #2f6fd0;
+  --color-info-soft: #e7effb;
+  --color-sidebar: #ffffff;
+  --color-sidebar-text: #3d4b56;
+  --color-sidebar-brand: #067a62;
+  --color-sidebar-raised: #f0f3f6;
+  --color-overlay: rgb(15 27 36 / 0.45);
+  /* Brand panel (sign-in page): identical in both themes. */
+  --color-brand-deep: #06373a;
+  --color-brand-ink: #cfe8e0;
+  --color-brand-mint: #92de8b;
+  --color-brand-teal: #0e9f7e;
+
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  --shadow-pop: 0 12px 32px -8px rgb(16 24 40 / 0.18), 0 4px 8px -4px rgb(16 24 40 / 0.08);
+
+  --animate-fade-in: fade-in 120ms ease-out;
+  --animate-pop-in: pop-in 140ms ease-out;
+  --animate-slide-in: slide-in 180ms ease-out;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+    }
+  }
+  @keyframes slide-in {
+    from {
+      transform: translateX(-100%);
+    }
+  }
 }
 
 :root {
   color-scheme: light;
 }
 
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-base: #0b1218;
+  --color-surface: #111a22;
+  --color-raised: #17222c;
+  --color-sunken: #0e161d;
+  --color-edge: #223140;
+  --color-edge-strong: #33475a;
+  --color-text: #e4ebf1;
+  --color-muted: #a1b0bd;
+  --color-quiet: #6f8190;
+  --color-accent: #22c49b;
+  --color-accent-strong: #3fd6ae;
+  --color-accent-soft: #0f2f29;
+  --color-on-accent: #04211a;
+  --color-allow: #2fc79f;
+  --color-allow-soft: #0f2f29;
+  --color-block: #f06b6b;
+  --color-block-soft: #3a1a1d;
+  --color-warn: #e6b04d;
+  --color-warn-bg: #392a10;
+  --color-warn-text: #f3cf85;
+  --color-info: #6ea2f0;
+  --color-info-soft: #16263d;
+  --color-sidebar: #0e161d;
+  --color-sidebar-text: #b4c2ce;
+  --color-sidebar-brand: #3fd6ae;
+  --color-sidebar-raised: #17222c;
+  --color-overlay: rgb(0 0 0 / 0.6);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-pop: 0 16px 40px -8px rgb(0 0 0 / 0.6);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   background: var(--color-base);
   color: var(--color-text);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Keyboard focus ring for clickable elements; form controls draw their own. */
+:where(a, button, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--color-accent);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+/* Thin, theme-aware scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-edge-strong) transparent;
 }
 
 .react-flow__attribution {
   background: transparent;
   color: var(--color-quiet);
+}
+
+.react-flow__controls {
+  box-shadow: var(--shadow-card);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-edge);
+}
+
+.react-flow__controls-button {
+  background: var(--color-surface);
+  border-bottom-color: var(--color-edge);
+  color: var(--color-muted);
+  fill: var(--color-muted);
+}
+
+.react-flow__controls-button:hover {
+  background: var(--color-raised);
+}
+
+.react-flow__renderer,
+.react-flow {
+  --xy-background-color: transparent;
 }

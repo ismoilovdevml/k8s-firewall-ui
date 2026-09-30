@@ -199,6 +199,23 @@ test('builder previews impact while drawing', async ({ page }) => {
   await expect(page.getByText('impact preview')).toBeVisible()
 })
 
+test('command palette jumps to a policy and the theme switches to dark', async ({ page }) => {
+  await page.goto('/')
+  await page.keyboard.press('Control+k')
+  const palette = page.getByRole('dialog', { name: 'Command palette' })
+  await palette.getByLabel('Search commands').fill('cart-to-redis')
+  await palette.getByRole('button', { name: /shop\/cart-to-redis/ }).click()
+  await expect(page).toHaveURL(/\/policies\/shop\/cart-to-redis$/)
+
+  await page.getByRole('button', { name: /^Theme:/ }).click()
+  await page.getByRole('button', { name: 'Dark', exact: true }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await page.getByRole('button', { name: /^Theme:/ }).click()
+  await page.getByRole('button', { name: 'System', exact: true }).click()
+})
+
 test('a tenant sees only their own namespace', async ({ page }) => {
   test.skip(!tenantToken, 'FWUI_TENANT_TOKEN not set')
   await signOut(page)

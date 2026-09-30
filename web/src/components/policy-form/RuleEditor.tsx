@@ -1,30 +1,44 @@
 import type { RuleDraft } from '../../policy/model'
+import { IconPlus, IconTrash } from '../icons'
+import { Button } from '../ui'
 import PeerEditor from './PeerEditor'
 import PortListEditor from './PortListEditor'
 
 interface Props {
   value: RuleDraft
   direction: 'ingress' | 'egress'
+  index?: number
   onChange: (value: RuleDraft) => void
   onRemove: () => void
 }
 
-export default function RuleEditor({ value, direction, onChange, onRemove }: Props) {
+export default function RuleEditor({ value, direction, index, onChange, onRemove }: Props) {
   const setPeer = (i: number, peer: RuleDraft['peers'][number]) =>
     onChange({ ...value, peers: value.peers.map((p, j) => (j === i ? peer : p)) })
 
   return (
-    <div className="rounded-md border border-edge bg-base p-3">
+    <div className="rounded-xl border border-edge bg-raised/50 p-4">
       <div className="flex items-center justify-between">
-        <span className="font-mono text-xs text-muted">
+        <span className="flex items-center gap-2 text-sm font-semibold text-text">
+          {index !== undefined && (
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-soft text-[11px] text-accent-strong">
+              {index + 1}
+            </span>
+          )}
           {direction === 'ingress' ? 'Allow from' : 'Allow to'}
         </span>
-        <button type="button" onClick={onRemove} className="text-xs text-quiet hover:text-block">
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={onRemove}
+          icon={<IconTrash size={13} />}
+          className="hover:bg-block-soft hover:text-block"
+        >
           Remove rule
-        </button>
+        </Button>
       </div>
 
-      <div className="mt-2 space-y-2">
+      <div className="mt-3 space-y-2">
         {value.peers.map((peer, i) => (
           <PeerEditor
             key={i}
@@ -36,24 +50,20 @@ export default function RuleEditor({ value, direction, onChange, onRemove }: Pro
         {value.peers.length === 0 && (
           <p className="text-xs text-quiet">
             No peers — this rule allows traffic {direction === 'ingress' ? 'from' : 'to'}{' '}
-            <span className="text-accent-strong">anywhere</span>.
+            <span className="font-medium text-accent-strong">anywhere</span>.
           </p>
         )}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() =>
-              onChange({ ...value, peers: [...value.peers, { kind: 'pods', podSelector: {} }] })
-            }
-            className="rounded border border-edge px-2 py-1 text-xs text-muted hover:border-accent hover:text-accent-strong"
-          >
-            Add peer
-          </button>
-        </div>
+        <Button
+          size="sm"
+          onClick={() => onChange({ ...value, peers: [...value.peers, { kind: 'pods', podSelector: {} }] })}
+          icon={<IconPlus size={14} />}
+        >
+          Add peer
+        </Button>
       </div>
 
-      <div className="mt-3">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-quiet">ports</div>
+      <div className="mt-4 border-t border-edge pt-3">
+        <div className="mb-2 text-xs font-medium text-muted">Ports</div>
         <PortListEditor value={value.ports} onChange={(ports) => onChange({ ...value, ports })} />
       </div>
     </div>
