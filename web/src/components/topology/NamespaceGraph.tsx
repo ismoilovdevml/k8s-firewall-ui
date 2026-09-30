@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Suspense, lazy, useMemo, useState } from 'react'
 import { Background, Controls, Handle, MarkerType, Position, ReactFlow } from '@xyflow/react'
 import type { Edge, Node, NodeProps } from '@xyflow/react'
 import { errorMessage } from '../../api/client'
@@ -11,6 +11,10 @@ import { layoutCircle } from './layout'
 import FloatingEdge from './FloatingEdge'
 import { GraphHint, GraphPanel, LegendToggle } from './controls'
 import { REACH_STYLE, classify, type Reach } from './reach'
+import type { GraphDim } from './dim'
+import type { Link3D, Node3D } from './Graph3D'
+
+const Graph3D = lazy(() => import('./Graph3D'))
 
 function openText(c: VerdictCounts) {
   const total = c.allowed + c.blocked + c.unconstrained
@@ -54,7 +58,7 @@ function NamespaceNode({ data }: NodeProps) {
 const nodeTypes = { namespace: NamespaceNode }
 const edgeTypes = { floating: FloatingEdge }
 
-export default function NamespaceGraph({ onOpen }: { onOpen: (ns: string) => void }) {
+export default function NamespaceGraph({ onOpen, dim = '2d' }: { onOpen: (ns: string) => void; dim?: GraphDim }) {
   const { data, error, isLoading } = useNamespaceTopology(true)
   const theme = useTheme()
   const [visible, setVisible] = useState<Record<Reach, boolean>>({
@@ -93,6 +97,26 @@ export default function NamespaceGraph({ onOpen }: { onOpen: (ns: string) => voi
 
   const shown = edges.filter((e) => visible[(e.data as { reach: Reach }).reach])
 
+  const nodes3d = useMemo<Node3D[]>(
+    () => (data?.nodes ?? []).map((n) => ({ id: n.namespace, label: n.namespace, group: n.namespace, size: n.pods })),
+    [data],
+  )
+  const links3d = useMemo<Link3D[]>(
+    () =>
+      (data?.edges ?? [])
+        .map((e) => ({ e, reach: classify(e.counts) }))
+        .filter(({ reach }) => visible[reach])
+        .map(({ e, reach }) => ({
+          id: `${e.source}->${e.target}`,
+          source: e.source,
+          target: e.target,
+          colorToken: REACH_STYLE[reach].stroke.slice(4, -1),
+          particles: reach === 'blocked' ? 0 : reach === 'allowed' ? 3 : 1,
+          faint: reach === 'blocked',
+        })),
+    [data, visible],
+  )
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-edge bg-surface px-4 py-2.5">
@@ -117,7 +141,18 @@ export default function NamespaceGraph({ onOpen }: { onOpen: (ns: string) => voi
         {isLoading && <Spinner label="Computing namespace graph…" />}
         {error && <GraphHint tone="error">{errorMessage(error)}</GraphHint>}
         {data && data.nodes.length === 0 && <GraphHint>No application namespaces with running pods.</GraphHint>}
-        {nodes.length > 0 && (
+        {nodes.length > 0 && dim === '3d' && (
+          <Suspense fallback={<Spinner label="Loading 3D view…" />}>
+            <Graph3D
+              nodes={nodes3d}
+              links={links3d}
+              onNodeClick={onOpen}
+              onLinkClick={(id) => setActive(data?.edges.find((e) => `${e.source}->${e.target}` === id) ?? null)}
+              onBackgroundClick={() => setActive(null)}
+            />
+          </Suspense>
+        )}
+        {nodes.length > 0 && dim === '2d' && (
           <ReactFlow
             nodes={nodes}
             edges={shown}

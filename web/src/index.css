@@ -71,6 +71,16 @@
 
 :root {
   color-scheme: light;
+  /* Categorical colors for grouping, read from JS by the 3D topology
+     (plain variables: @theme drops tokens no utility class uses). */
+  --color-cat-1: #0e9f7e;
+  --color-cat-2: #2f6fd0;
+  --color-cat-3: #c2410c;
+  --color-cat-4: #7c3aed;
+  --color-cat-5: #65a30d;
+  --color-cat-6: #db2777;
+  --color-cat-7: #0891b2;
+  --color-cat-8: #475569;
 }
 
 :root[data-theme='dark'] {
@@ -102,6 +112,14 @@
   --color-sidebar-brand: #3fd6ae;
   --color-sidebar-raised: #17222c;
   --color-overlay: rgb(0 0 0 / 0.6);
+  --color-cat-1: #2fd3a8;
+  --color-cat-2: #6ea2f0;
+  --color-cat-3: #fb8a4c;
+  --color-cat-4: #a78bfa;
+  --color-cat-5: #f5b53f;
+  --color-cat-6: #f472b6;
+  --color-cat-7: #38c7e8;
+  --color-cat-8: #9bd14a;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
   --shadow-pop: 0 16px 40px -8px rgb(0 0 0 / 0.6);
 }

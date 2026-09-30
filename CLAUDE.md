@@ -38,7 +38,7 @@ Browser (React SPA) ── REST /api/v1 + SSE /api/v1/events ──▶ Go binary
 | `internal/lint` | `k8s-firewall-ui lint`: offline manifest checks + `--cluster` overlay (new findings, impact); text/json/github output |
 | `internal/cni` | heuristic CNI detection (kube-system DaemonSets + CRD discovery), `--cni-override` escape hatch |
 
-Frontend (`web/src/`): `api/` (fetch client, query keys, sse), `pages/` (Overview, Topology, Policies, PolicyDetail, PolicyNew, Simulator, Builder, Audit, Login), `components/` (`ui.tsx` primitives + `styles.ts` class helpers, `icons.tsx` inline SVG icons, `nav.tsx` sidebar groups, Layout, CommandPalette (Ctrl/⌘K), AuthGate, ImpactPanel, ImportDialog), `theme.ts` (light/dark/system; `public/theme-init.js` applies it before paint — CSP forbids inline scripts), `policy/` (draft model, templates, diff), `hooks/useSSEInvalidation.ts`. State: TanStack Query + SSE invalidation; zustand only for the builder canvas.
+Frontend (`web/src/`): `api/` (fetch client, query keys, sse), `pages/` (Overview, Topology, Policies, PolicyDetail, PolicyNew, Simulator, Builder, Audit, Login), `components/` (`ui.tsx` primitives + `styles.ts` class helpers, `icons.tsx` inline SVG icons, `nav.tsx` sidebar groups, Layout, CommandPalette (Ctrl/⌘K), AuthGate, ImpactPanel, ImportDialog), `components/topology/` (2D React Flow graphs with a d3-force clustered layout; `Graph3D.tsx` is the lazily loaded three.js view via react-force-graph-3d), `theme.ts` (light/dark/system; `public/theme-init.js` applies it before paint — CSP forbids inline scripts), `policy/` (draft model, templates, diff), `hooks/useSSEInvalidation.ts`. State: TanStack Query + SSE invalidation; zustand only for the builder canvas.
 
 ## Conventions
 

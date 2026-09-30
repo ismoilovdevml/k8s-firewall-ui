@@ -26,9 +26,11 @@
 
   ![Observed traffic on the topology](docs/screenshots/topology-observed.png)
 
-- 🗺️ **Topology viewer**: a namespace-level map of the whole cluster (fully open, partially open, blocked, unrestricted between every pair of teams) that drills down into a live workload graph. Green means allowed by policy, red means blocked, dotted means no policy applies. Filter by verdict, and click an edge to see which policies decide it.
+- 🗺️ **Topology viewer**: a namespace-level map of the whole cluster (fully open, partially open, blocked, unrestricted between every pair of teams) that drills down into a live workload graph. Green means allowed by policy, red means blocked, dotted means no policy applies. Filter by verdict, and click an edge to see which policies decide it. Workloads are laid out in per-namespace clusters, and hovering one highlights its connections. Switch to **3D** for an interactive three.js view where namespaces are colored clusters and particles flow along the connections that are open.
 
   ![Topology](docs/screenshots/topology-namespaces.png)
+
+  ![3D topology](docs/screenshots/topology-3d.png)
 
 - ✏️ **Policy management**: list, inspect (human-readable rule rendering), create, edit (form + YAML), and delete NetworkPolicies. Every change can be validated with a server-side dry-run first, and concurrent edits are detected via resourceVersion.
 - 🔮 **Impact preview**: before you create, edit or delete a policy, see exactly which workload-to-workload connections become blocked or allowed.

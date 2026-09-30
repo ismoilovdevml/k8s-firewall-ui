@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useMemo, useState } from 'react'
 import { ReactFlow, Background, Controls, MarkerType } from '@xyflow/react'
 import type { Edge, Node } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -8,20 +8,25 @@ import { ApiError } from '../api/client'
 import type { EdgeVerdict, TopologyEdge } from '../api/types'
 import WorkloadNode from '../components/topology/WorkloadNode'
 import NamespaceGraph from '../components/topology/NamespaceGraph'
-import { layoutCircle } from '../components/topology/layout'
+import { layoutClusters } from '../components/topology/layout'
 import FloatingEdge from '../components/topology/FloatingEdge'
 import { GraphHint, GraphPanel, LegendToggle } from '../components/topology/controls'
+import { useGraphDim } from '../components/topology/dim'
+import type { GraphDim } from '../components/topology/dim'
+import type { Link3D, Node3D } from '../components/topology/Graph3D'
 import { IconBox, IconLayers } from '../components/icons'
-import { Badge, Segmented } from '../components/ui'
+import { Badge, Segmented, Spinner } from '../components/ui'
 import { useTheme } from '../theme'
+
+const Graph3D = lazy(() => import('../components/topology/Graph3D'))
 
 const nodeTypes = { workload: WorkloadNode }
 const edgeTypes = { floating: FloatingEdge }
 
-const VERDICT_STYLE: Record<EdgeVerdict, { stroke: string; dash?: string; label: string }> = {
-  allowed: { stroke: 'var(--color-allow)', label: 'allowed by policy' },
-  blocked: { stroke: 'var(--color-block)', dash: '6 4', label: 'blocked' },
-  unconstrained: { stroke: 'var(--color-quiet)', dash: '2 4', label: 'no policy applies' },
+const VERDICT_STYLE: Record<EdgeVerdict, { stroke: string; token: string; dash?: string; label: string }> = {
+  allowed: { stroke: 'var(--color-allow)', token: '--color-allow', label: 'allowed by policy' },
+  blocked: { stroke: 'var(--color-block)', token: '--color-block', dash: '6 4', label: 'blocked' },
+  unconstrained: { stroke: 'var(--color-quiet)', token: '--color-quiet', dash: '2 4', label: 'no policy applies' },
 }
 
 type View = 'namespaces' | 'workloads'
@@ -29,6 +34,7 @@ type View = 'namespaces' | 'workloads'
 export default function TopologyPage() {
   const [view, setView] = useState<View>('namespaces')
   const [selected, setSelected] = useState<string[]>([])
+  const [dim, setDim] = useGraphDim()
   const openNamespace = useCallback((ns: string) => {
     setSelected([ns])
     setView('workloads')
@@ -62,6 +68,15 @@ export default function TopologyPage() {
             },
           ]}
         />
+        <Segmented
+          label="Rendering"
+          value={dim}
+          onChange={setDim}
+          options={[
+            { id: '2d', label: '2D' },
+            { id: '3d', label: '3D' },
+          ]}
+        />
         <p className="text-sm text-muted">
           {view === 'namespaces'
             ? 'Which teams can reach which: one node per namespace, lines summarize every workload pair.'
@@ -70,9 +85,9 @@ export default function TopologyPage() {
       </div>
       <div className="min-h-0 flex-1">
         {view === 'namespaces' ? (
-          <NamespaceGraph onOpen={openNamespace} />
+          <NamespaceGraph onOpen={openNamespace} dim={dim} />
         ) : (
-          <WorkloadTopology selected={selected} setSelected={setSelected} />
+          <WorkloadTopology selected={selected} setSelected={setSelected} dim={dim} />
         )}
       </div>
     </div>
@@ -82,9 +97,11 @@ export default function TopologyPage() {
 function WorkloadTopology({
   selected,
   setSelected,
+  dim,
 }: {
   selected: string[]
   setSelected: React.Dispatch<React.SetStateAction<string[]>>
+  dim: GraphDim
 }) {
   const { data: namespaces } = useNamespaces()
   const navigate = useNavigate()
@@ -95,6 +112,8 @@ function WorkloadTopology({
     unconstrained: true,
   })
   const [observedOnly, setObservedOnly] = useState(false)
+  const [hovered, setHovered] = useState<string | null>(null)
+  const [activeNode, setActiveNode] = useState<string | null>(null)
 
   const topology = useTopology(selected)
   const theme = useTheme()
@@ -124,18 +143,66 @@ function WorkloadTopology({
         data: { edge: e },
       }
     })
-    // Nodes arrive sorted by namespace/workload, so a circle keeps each
-    // namespace's workloads adjacent; hiding a verdict never moves nodes.
-    return { nodes: layoutCircle(rfNodes), edges: rfEdges }
+    // Each namespace forms its own cluster; the layout depends only on the
+    // graph, so hiding a verdict never moves nodes.
+    // Only connections that can carry traffic pull workloads together.
+    const laidOut = layoutClusters(
+      rfNodes,
+      topology.data.edges.filter((e) => e.verdict !== 'blocked'),
+      (n) => (n.data as { info: { namespace: string } }).info.namespace,
+    )
+    return { nodes: laidOut, edges: rfEdges }
   }, [topology.data])
   const shownEdges = useMemo(
     () =>
-      edges.filter((e) => {
-        const edge = (e.data as { edge: TopologyEdge }).edge
-        return visible[edge.verdict] && (!observedOnly || edge.observed)
-      }),
-    [edges, visible, observedOnly],
+      edges
+        .filter((e) => {
+          const edge = (e.data as { edge: TopologyEdge }).edge
+          return visible[edge.verdict] && (!observedOnly || edge.observed)
+        })
+        // Hovering a workload highlights its own connections.
+        .map((e) =>
+          hovered && e.source !== hovered && e.target !== hovered ? { ...e, style: { ...e.style, opacity: 0.12 } } : e,
+        ),
+    [edges, visible, observedOnly, hovered],
   )
+  const shownNodes = useMemo(() => {
+    if (!hovered) return nodes
+    const near = new Set([hovered])
+    for (const e of shownEdges) {
+      if (e.source === hovered) near.add(e.target)
+      if (e.target === hovered) near.add(e.source)
+    }
+    return nodes.map((n) => (near.has(n.id) ? n : { ...n, style: { opacity: 0.35 } }))
+  }, [nodes, shownEdges, hovered])
+
+  // Same graph for the 3D view.
+  const nodes3d = useMemo<Node3D[]>(
+    () =>
+      (topology.data?.nodes ?? []).map((n) => ({
+        id: n.id,
+        label: n.workload.split('/').slice(1).join('/') || n.workload,
+        group: n.namespace,
+        size: n.podCount,
+      })),
+    [topology.data],
+  )
+  const links3d = useMemo<Link3D[]>(
+    () =>
+      (topology.data?.edges ?? [])
+        .filter((e) => visible[e.verdict] && (!observedOnly || e.observed))
+        .map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          colorToken: VERDICT_STYLE[e.verdict].token,
+          particles: e.verdict === 'blocked' ? 0 : e.observed ? 4 : e.verdict === 'allowed' ? 2 : 1,
+          emphasis: !!e.observed,
+          faint: e.verdict === 'blocked',
+        })),
+    [topology.data, visible, observedOnly],
+  )
+  const nodeInfo = activeNode ? topology.data?.nodes.find((n) => n.id === activeNode) : undefined
   const observedCount = topology.data?.edges.filter((e) => e.observed).length ?? 0
   // Traffic that was flowing but current policies block: likely broken.
   const observedBlocked = topology.data?.edges.filter((e) => e.observed && e.verdict === 'blocked').length ?? 0
@@ -230,9 +297,30 @@ function WorkloadTopology({
         {topology.data && topology.data.nodes.length === 0 && (
           <GraphHint>No running workloads in this selection.</GraphHint>
         )}
-        {nodes.length > 0 && (
+        {nodes.length > 0 && dim === '3d' && (
+          <Suspense fallback={<Spinner label="Loading 3D view…" />}>
+            <Graph3D
+              nodes={nodes3d}
+              links={links3d}
+              selectedId={activeNode}
+              onNodeClick={(id) => {
+                setActiveEdge(null)
+                setActiveNode(id)
+              }}
+              onLinkClick={(id) => {
+                setActiveNode(null)
+                setActiveEdge(topology.data?.edges.find((e) => e.id === id) ?? null)
+              }}
+              onBackgroundClick={() => {
+                setActiveNode(null)
+                setActiveEdge(null)
+              }}
+            />
+          </Suspense>
+        )}
+        {nodes.length > 0 && dim === '2d' && (
           <ReactFlow
-            nodes={nodes}
+            nodes={shownNodes}
             edges={shownEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -242,6 +330,8 @@ function WorkloadTopology({
                 `/firewall?namespace=${encodeURIComponent(info.namespace)}&workload=${encodeURIComponent(info.workload)}`,
               )
             }}
+            onNodeMouseEnter={(_, node) => setHovered(node.id)}
+            onNodeMouseLeave={() => setHovered(null)}
             onEdgeClick={(_, edge) => setActiveEdge((edge.data as { edge: TopologyEdge }).edge)}
             onPaneClick={() => setActiveEdge(null)}
             fitView
@@ -253,6 +343,40 @@ function WorkloadTopology({
           </ReactFlow>
         )}
 
+        {nodeInfo && !activeEdge && (
+          <GraphPanel onClose={() => setActiveNode(null)}>
+            <div className="pr-8 font-mono text-sm font-semibold text-text">{nodeInfo.workload}</div>
+            <div className="mt-0.5 text-xs text-muted">
+              namespace <span className="font-mono">{nodeInfo.namespace}</span> · {nodeInfo.podCount} pod
+              {nodeInfo.podCount === 1 ? '' : 's'}
+            </div>
+            {nodeInfo.hostNetwork && (
+              <p className="mt-2 text-xs text-warn-text">Runs on the host network — policy selectors do not apply.</p>
+            )}
+            <dl className="mt-3 space-y-1 text-xs">
+              {(['allowed', 'blocked', 'unconstrained'] as EdgeVerdict[]).map((v) => {
+                const n = (topology.data?.edges ?? []).filter(
+                  (e) => e.verdict === v && (e.source === nodeInfo.id || e.target === nodeInfo.id),
+                ).length
+                return (
+                  <div key={v} className="flex justify-between">
+                    <dt className="flex items-center gap-2 text-muted">
+                      <span className="h-2 w-2 rounded-full" style={{ background: VERDICT_STYLE[v].stroke }} />
+                      {VERDICT_STYLE[v].label}
+                    </dt>
+                    <dd className="font-semibold tabular-nums text-text">{n}</dd>
+                  </div>
+                )
+              })}
+            </dl>
+            <Link
+              to={`/firewall?namespace=${encodeURIComponent(nodeInfo.namespace)}&workload=${encodeURIComponent(nodeInfo.workload)}`}
+              className="mt-3 inline-flex text-sm font-medium text-accent-strong hover:underline"
+            >
+              Open firewall →
+            </Link>
+          </GraphPanel>
+        )}
         {activeEdge && (
           <GraphPanel onClose={() => setActiveEdge(null)}>
             <div className="min-w-0 pr-8 font-mono text-xs text-muted">

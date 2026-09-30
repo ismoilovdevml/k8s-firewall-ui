@@ -6,21 +6,21 @@ test.describe.configure({ mode: 'serial' })
 test.describe('sign-in', () => {
   test.use({ storageState: { cookies: [], origins: [] } })
 
-test('rejects an invalid token and signs in with a valid one', async ({ page }) => {
-  const me = await (await page.request.get('/api/v1/auth/me')).json()
-  test.skip(me.mode !== 'token', 'server is not in token auth mode')
-  await page.goto('/policies')
-  await expect(page).toHaveURL(/\/login\?next=%2Fpolicies/)
-  await page.getByLabel('bearer token').fill('not-a-real-token')
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('alert')).toContainText('rejected this token')
+  test('rejects an invalid token and signs in with a valid one', async ({ page }) => {
+    const me = await (await page.request.get('/api/v1/auth/me')).json()
+    test.skip(me.mode !== 'token', 'server is not in token auth mode')
+    await page.goto('/policies')
+    await expect(page).toHaveURL(/\/login\?next=%2Fpolicies/)
+    await page.getByLabel('bearer token').fill('not-a-real-token')
+    await page.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page.getByRole('alert')).toContainText('rejected this token')
 
-  await page.getByLabel('bearer token').fill(editorToken)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL(/\/policies$/)
-  await expect(page.getByText('signed in as')).toBeVisible()
-  await page.screenshot({ path: 'e2e-results/shots/policies.png', fullPage: true })
-})
+    await page.getByLabel('bearer token').fill(editorToken)
+    await page.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page).toHaveURL(/\/policies$/)
+    await expect(page.getByText('signed in as')).toBeVisible()
+    await page.screenshot({ path: 'e2e-results/shots/policies.png', fullPage: true })
+  })
 })
 
 test('overview reports posture and the planted mistakes', async ({ page }) => {
@@ -79,6 +79,20 @@ async function pickPod(page: import('@playwright/test').Page, side: string, ns: 
   const value = await pod.locator('option', { hasText: prefix }).first().getAttribute('value')
   await pod.selectOption(value!)
 }
+
+test('topology switches between 2D and 3D rendering', async ({ page }) => {
+  await page.goto('/topology')
+  await expect(page.locator('.react-flow__node')).toHaveCount(5)
+  await page.getByRole('button', { name: '3D', exact: true }).click()
+  // Headless browsers without WebGL get an explanation instead of a canvas.
+  await expect(page.locator('[data-graph3d] canvas').or(page.getByText('3D view needs WebGL'))).toBeVisible()
+  await expect(page.locator('.react-flow__node')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Workloads', exact: true }).click()
+  await page.getByRole('button', { name: /^shop\s*\d+$/ }).click()
+  await expect(page.locator('[data-graph3d] canvas').or(page.getByText('3D view needs WebGL'))).toBeVisible()
+  await page.getByRole('button', { name: '2D', exact: true }).click()
+  await expect(page.locator('.react-flow__node').first()).toBeVisible()
+})
 
 test('simulator explains allowed and blocked connections', async ({ page }) => {
   await signIn(page)
@@ -152,9 +166,12 @@ test('import validates first, then applies', async ({ page }) => {
   await deletePolicy(page, 'analytics', 'e2e-imported')
   await page.goto('/policies')
   await page.getByRole('button', { name: 'Import' }).click()
-  await page.getByRole('dialog').locator('textarea').fill(
-    'apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: e2e-imported\n  namespace: analytics\nspec:\n  podSelector: {matchLabels: {app: dashboard}}\n  policyTypes: [Ingress]\n  ingress:\n    - from: [{podSelector: {matchLabels: {app: collector}}}]\n',
-  )
+  await page
+    .getByRole('dialog')
+    .locator('textarea')
+    .fill(
+      'apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: e2e-imported\n  namespace: analytics\nspec:\n  podSelector: {matchLabels: {app: dashboard}}\n  policyTypes: [Ingress]\n  ingress:\n    - from: [{podSelector: {matchLabels: {app: collector}}}]\n',
+    )
   const importBtn = page.getByRole('dialog').getByRole('button', { name: 'Import', exact: true })
   await expect(importBtn).toBeDisabled()
   await page.getByRole('button', { name: 'Validate (dry-run)' }).click()
